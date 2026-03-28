@@ -1,0 +1,15 @@
+{
+  "name": "ollama-completion.nvim devcontainer",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "runArgs": [
+    "--add-host=host.docker.internal:host-gateway"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/goropikari/devcontainer-feature/neovim:1": {},
+    "ghcr.io/goropikari/devcontainer-feature/tree-sitter:1": {}
+  },
+  "postCreateCommand": "cp -r .devcontainer/nvim ~/.config"
+}
