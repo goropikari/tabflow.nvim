@@ -1,0 +1,262 @@
+local state = require('tabflow.state')
+local tabline = require('tabflow.tabline')
+
+local M = {}
+
+function M.setup()
+  -- Global mappings for raw mouse event tracking
+  vim.keymap.set('', '<LeftMouse>', function()
+    M.on_left_mouse()
+    return '<LeftMouse>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<MiddleMouse>', function()
+    M.on_middle_mouse()
+    return '<MiddleMouse>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<RightMouse>', function()
+    M.on_right_mouse()
+    return '<RightMouse>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<ScrollWheelDown>', function()
+    M.on_scroll_wheel('down')
+    return '<ScrollWheelDown>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<ScrollWheelUp>', function()
+    M.on_scroll_wheel('up')
+    return '<ScrollWheelUp>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<LeftDrag>', function()
+    M.on_left_drag()
+    return '<LeftDrag>'
+  end, { expr = true })
+
+  vim.keymap.set('', '<LeftRelease>', function()
+    M.on_left_release()
+    return '<LeftRelease>'
+  end, { expr = true })
+end
+
+function M.on_left_mouse()
+  local mouse = vim.fn.getmousepos()
+  if mouse.screenrow == 1 then
+    local item = tabline.hit_test(mouse.screencol - 1)
+    state.state.drag.active = false
+    state.state.drag.pending = {
+      item = item,
+      start_mouse = { row = mouse.screenrow, col = mouse.screencol },
+    }
+  else
+    state.state.drag.pending = nil
+  end
+end
+
+function M.on_middle_mouse()
+  local mouse = vim.fn.getmousepos()
+  if mouse.screenrow == 1 then
+    local item = tabline.hit_test(mouse.screencol - 1)
+    if item then
+      vim.schedule(function()
+        local actions = require('tabflow.actions')
+        if item.kind == 'tab' then
+          actions.close_tab(item.id)
+        elseif item.kind == 'buffer' then
+          actions.close_buffer(item.id)
+        end
+      end)
+    end
+  end
+end
+
+function M.on_right_mouse()
+  local mouse = vim.fn.getmousepos()
+  if mouse.screenrow == 1 then
+    local item = tabline.hit_test(mouse.screencol - 1)
+    if item and item.kind == 'tab' then
+      vim.schedule(function()
+        local actions = require('tabflow.actions')
+        actions.prompt_rename_tab(item.id)
+      end)
+    end
+  end
+end
+
+function M.on_scroll_wheel(direction)
+  local mouse = vim.fn.getmousepos()
+  if mouse.screenrow == 1 then
+    vim.schedule(function()
+      local actions = require('tabflow.actions')
+      local s = require('tabflow.state')
+      if s.state.mode == 'tabs' then
+        if direction == 'down' then
+          actions.next_tab()
+        else
+          actions.prev_tab()
+        end
+      else
+        if direction == 'down' then
+          actions.next_buffer()
+        else
+          actions.prev_buffer()
+        end
+      end
+    end)
+  end
+end
+
+function M.on_left_drag()
+  local mouse = vim.fn.getmousepos()
+  local drag = state.state.drag
+
+  if drag.pending then
+    local dx = math.abs(mouse.screencol - drag.pending.start_mouse.col)
+    local dy = math.abs(mouse.screenrow - drag.pending.start_mouse.row)
+
+    if not drag.active and (dx > 2 or dy > 0) then
+      local item = drag.pending.item
+      if item and (item.kind == 'tab' or item.kind == 'buffer') then
+        drag.active = true
+        drag.kind = item.kind
+        drag.source_id = item.id
+        drag.source_tab = vim.api.nvim_get_current_tabpage()
+        drag.source_index = item.index
+        drag.start_mouse = drag.pending.start_mouse
+
+        -- Schedule ghost creation to avoid E565
+        local label = item.label
+        vim.schedule(function()
+          M.create_ghost(label)
+        end)
+      end
+    end
+  end
+
+  if drag.active then
+    local item = tabline.hit_test(mouse.screencol - 1)
+
+    if item and item.kind == 'mode_toggle' then
+      vim.schedule(function()
+        require('tabflow.actions').toggle_mode()
+      end)
+      drag.hover_target = nil
+    else
+      drag.hover_target = item
+    end
+
+    -- Schedule ghost update and redraw to avoid E565
+    local col = mouse.screencol - 1
+    vim.schedule(function()
+      M.update_ghost(col)
+      vim.cmd('redrawtabline')
+    end)
+  end
+end
+
+function M.on_left_release()
+  local mouse = vim.fn.getmousepos()
+  local drag = state.state.drag
+
+  if drag.active then
+    local drag_data = {
+      kind = drag.kind,
+      source_id = drag.source_id,
+      source_tab = drag.source_tab,
+      source_index = drag.source_index,
+      hover_target = drag.hover_target,
+    }
+    vim.schedule(function()
+      M.handle_drop_logic(drag_data)
+      M.cleanup_ghost()
+    end)
+  elseif drag.pending then
+    if mouse.screenrow == 1 then
+      local item = drag.pending.item
+      if item then
+        vim.schedule(function()
+          local actions = require('tabflow.actions')
+          if item.kind == 'mode_toggle' then
+            actions.toggle_mode()
+          elseif item.kind == 'tab' then
+            actions.switch_to_tab(item.id)
+          elseif item.kind == 'buffer' then
+            actions.switch_to_buffer(item.id)
+          end
+        end)
+      end
+    end
+  end
+
+  drag.active = false
+  drag.pending = nil
+  vim.cmd('redrawtabline')
+end
+
+function M.create_ghost(label)
+  local drag = state.state.drag
+  if not drag.buffer or not vim.api.nvim_buf_is_valid(drag.buffer) then
+    drag.buffer = vim.api.nvim_create_buf(false, true)
+  end
+  vim.api.nvim_buf_set_lines(drag.buffer, 0, -1, false, { label })
+
+  drag.window = vim.api.nvim_open_win(drag.buffer, false, {
+    relative = 'tabline',
+    row = 0,
+    col = 0,
+    width = #label,
+    height = 1,
+    style = 'minimal',
+    border = 'single',
+    zindex = 250,
+    mouse = false,
+  })
+  vim.api.nvim_set_option_value('winhl', 'Normal:IdeTablineHover', { win = drag.window })
+end
+
+function M.update_ghost(col)
+  local drag = state.state.drag
+  if drag.window and vim.api.nvim_win_is_valid(drag.window) then
+    vim.api.nvim_win_set_config(drag.window, {
+      relative = 'tabline',
+      row = 0,
+      col = col,
+    })
+  end
+end
+
+function M.cleanup_ghost()
+  local drag = state.state.drag
+  if drag.window and vim.api.nvim_win_is_valid(drag.window) then
+    vim.api.nvim_win_close(drag.window, true)
+  end
+  drag.window = nil
+end
+
+function M.handle_drop_logic(data)
+  local actions = require('tabflow.actions')
+  local target = data.hover_target
+
+  if data.kind == 'tab' then
+    if target and target.kind == 'tab' then
+      actions.reorder_tabs(data.source_id, target.index)
+    else
+      local tab_handles = vim.api.nvim_list_tabpages()
+      actions.reorder_tabs(data.source_id, #tab_handles)
+    end
+  elseif data.kind == 'buffer' then
+    if target and target.kind == 'buffer' then
+      if data.source_tab == vim.api.nvim_get_current_tabpage() then
+        actions.reorder_buffers(data.source_tab, data.source_index, target.index)
+      else
+        actions.move_buffer_between_tabs(data.source_id, data.source_tab, vim.api.nvim_get_current_tabpage(), target.index)
+      end
+    elseif target and target.kind == 'tab' then
+      actions.move_buffer_between_tabs(data.source_id, data.source_tab, target.id, nil)
+    end
+  end
+end
+
+return M
