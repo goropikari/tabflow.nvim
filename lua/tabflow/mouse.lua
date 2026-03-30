@@ -181,7 +181,12 @@ function M.on_left_release()
           if item.kind == 'mode_toggle' then
             actions.toggle_mode()
           elseif item.kind == 'tab' then
-            actions.switch_to_tab(item.id)
+            -- tabs モードの場合は mode を変えずに tab だけ切り替える
+            if state.state.mode == 'tabs' then
+              vim.api.nvim_set_current_tabpage(item.id)
+            else
+              actions.switch_to_tab(item.id)
+            end
           elseif item.kind == 'buffer' then
             actions.switch_to_buffer(item.id)
           end
