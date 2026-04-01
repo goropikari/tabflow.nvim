@@ -14,8 +14,10 @@ function M.setup()
         state.add_buffer(current_tab, bufnr)
 
         local s = state.get_tab_state(current_tab)
-        s.current = bufnr
-        state.save_tab_state(current_tab)
+        if s then
+          s.current = bufnr
+          state.save_tab_state(current_tab)
+        end
       end
     end,
   })

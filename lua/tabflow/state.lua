@@ -33,6 +33,10 @@ end
 
 function M.ensure_tab(tab_handle)
   if not M.state.tabs[tab_handle] then
+    if not vim.api.nvim_tabpage_is_valid(tab_handle) then
+      return
+    end
+
     -- title (一般的に使われる) または tabflow_name から読み込み
     local ok_name, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'title')
     if not ok_name then
@@ -80,6 +84,10 @@ end
 
 function M.add_buffer(tab_handle, bufnr)
   local s = M.get_tab_state(tab_handle)
+  if not s then
+    return
+  end
+
   -- Use vim.iter for 0.11 style
   if vim.iter(s.buffers):find(function(b)
     return b == bufnr
@@ -93,6 +101,10 @@ end
 
 function M.remove_buffer(tab_handle, bufnr)
   local s = M.get_tab_state(tab_handle)
+  if not s then
+    return
+  end
+
   for i, b in ipairs(s.buffers) do
     if b == bufnr then
       table.remove(s.buffers, i)
@@ -113,13 +125,21 @@ end
 
 function M.remove_tab_state(tab_handle)
   M.state.tabs[tab_handle] = nil
-  pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_name')
-  pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_buffers')
-  pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_current')
+  if vim.api.nvim_tabpage_is_valid(tab_handle) then
+    pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_name')
+    pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_buffers')
+    pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_current')
+  end
 end
 
 function M.get_tab_name(tab_handle)
   local s = M.get_tab_state(tab_handle)
+  if not s then
+    if vim.api.nvim_tabpage_is_valid(tab_handle) then
+      return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
+    end
+    return 'Tab ?'
+  end
 
   -- 1. 明示的に設定された名前がある場合（Tab N というデフォルト形式以外）
   if s.name and not s.name:match('^Tab %d+$') then
@@ -135,17 +155,25 @@ function M.get_tab_name(tab_handle)
   end
 
   -- 3. 代替として現在のタブ番号
-  return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
+  if vim.api.nvim_tabpage_is_valid(tab_handle) then
+    return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
+  end
+  return 'Tab ?'
 end
 
 function M.rename_tab(tab_handle, name)
   local s = M.get_tab_state(tab_handle)
-  s.name = name
-  M.save_tab_state(tab_handle)
+  if s then
+    s.name = name
+    M.save_tab_state(tab_handle)
+  end
 end
 
 function M.set_tab_name_to_git_branch(tab_handle)
   tab_handle = tab_handle or vim.api.nvim_get_current_tabpage()
+  if not vim.api.nvim_tabpage_is_valid(tab_handle) then
+    return
+  end
 
   local root = vim.fn.system('git -C ' .. vim.fn.shellescape(vim.fn.getcwd()) .. ' rev-parse --show-toplevel 2>/dev/null')
   root = root:gsub('%s+$', '')
@@ -230,13 +258,20 @@ end
 
 function M.save_tab_state(tab_handle)
   local s = M.state.tabs[tab_handle]
-  if s then
-    vim.api.nvim_tabpage_set_var(tab_handle, 'tabflow_name', s.name)
-    -- title 変数 (t:title) も更新して他プラグインとも同期
-    vim.api.nvim_tabpage_set_var(tab_handle, 'title', s.name)
-    vim.api.nvim_tabpage_set_var(tab_handle, 'tabflow_buffers', s.buffers)
-    vim.api.nvim_tabpage_set_var(tab_handle, 'tabflow_current', s.current)
+  if not s then
+    return
   end
+
+  if not vim.api.nvim_tabpage_is_valid(tab_handle) then
+    M.state.tabs[tab_handle] = nil
+    return
+  end
+
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
+  -- title 変数 (t:title) も更新して他プラグインとも同期
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
 end
 
 return M

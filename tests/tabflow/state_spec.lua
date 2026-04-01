@@ -57,4 +57,14 @@ describe('tabflow.state', function()
     local s = state.get_tab_state(tab)
     assert.are.equal(name, s.name)
   end)
+
+  it('should not crash when a tab handle is invalid', function()
+    local fake_tab = 9999 -- Hopefully non-existent
+    state.state.tabs[fake_tab] = { name = 'Fake', buffers = { 1 }, current = 1 }
+
+    -- This should not throw 'Invalid tabpage id' error
+    assert.has_no_errors(function()
+      state.remove_buffer_everywhere(1)
+    end)
+  end)
 end)
