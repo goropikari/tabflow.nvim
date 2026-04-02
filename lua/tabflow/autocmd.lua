@@ -22,11 +22,37 @@ function M.setup()
     end,
   })
 
-  vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
+  -- Clean up buffer references in tab states when buffers are deleted/wiped out
+  local function cleanup_buffer_in_all_tabs(bufnr)
+    for tab_handle, s in pairs(state.state.tabs) do
+      if s.buffers and type(s.buffers) == 'table' then
+        for i, b in ipairs(s.buffers) do
+          if b == bufnr then
+            table.remove(s.buffers, i)
+            break
+          end
+        end
+        -- Update current buffer if it was deleted
+        if s.current == bufnr then
+          s.current = s.buffers[#s.buffers] or nil
+          state.save_tab_state(tab_handle)
+        end
+      end
+    end
+    vim.cmd('redrawtabline')
+  end
+
+  vim.api.nvim_create_autocmd('BufWipeout', {
     group = group,
     callback = function(ev)
-      state.remove_buffer_everywhere(ev.buf)
-      vim.cmd('redrawtabline')
+      cleanup_buffer_in_all_tabs(ev.buf)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd('BufDelete', {
+    group = group,
+    callback = function(ev)
+      cleanup_buffer_in_all_tabs(ev.buf)
     end,
   })
 

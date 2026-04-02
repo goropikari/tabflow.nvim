@@ -105,16 +105,28 @@ function M.remove_buffer(tab_handle, bufnr)
     return
   end
 
+  -- Check if buffer is still valid before removing
+  local is_valid = vim.api.nvim_buf_is_valid(bufnr)
+
   for i, b in ipairs(s.buffers) do
     if b == bufnr then
-      table.remove(s.buffers, i)
+      -- Only remove if buffer is still valid
+      if is_valid then
+        table.remove(s.buffers, i)
+      end
       break
     end
   end
-  if s.current == bufnr then
+
+  -- Update current buffer if needed
+  if s.current and not is_valid then
     s.current = s.buffers[#s.buffers] or nil
+    M.save_tab_state(tab_handle)
+  elseif not is_valid and #s.buffers == 0 then
+    -- Last buffer was removed, clear current
+    s.current = nil
+    M.save_tab_state(tab_handle)
   end
-  M.save_tab_state(tab_handle)
 end
 
 function M.remove_buffer_everywhere(bufnr)
@@ -124,12 +136,14 @@ function M.remove_buffer_everywhere(bufnr)
 end
 
 function M.remove_tab_state(tab_handle)
-  M.state.tabs[tab_handle] = nil
   if vim.api.nvim_tabpage_is_valid(tab_handle) then
+    -- Clean up tabpage variables if valid
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_name')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_buffers')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_current')
   end
+  -- Always remove from internal state, even if tab is invalid
+  M.state.tabs[tab_handle] = nil
 end
 
 function M.get_tab_name(tab_handle)
