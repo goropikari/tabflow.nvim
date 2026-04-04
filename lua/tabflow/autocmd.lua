@@ -75,6 +75,16 @@ function M.setup()
       vim.cmd('redrawtabline')
     end,
   })
+
+  vim.api.nvim_create_autocmd('SessionLoadPost', {
+    group = group,
+    callback = function()
+      -- セッション読み込み後に内部状態をクリアして、グローバル変数から復元する
+      state.state.tabs = {}
+      state.restore_from_global()
+      vim.cmd('redrawtabline')
+    end,
+  })
 end
 
 function M.is_normal_file_buffer(bufnr)

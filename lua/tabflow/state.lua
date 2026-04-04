@@ -79,6 +79,7 @@ function M.ensure_tab(tab_handle)
       buffers = buffers,
       current = current,
     }
+    M.save_tab_state(tab_handle)
   end
 end
 
@@ -286,6 +287,77 @@ function M.save_tab_state(tab_handle)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
+
+  -- セッション保存用にグローバル変数にも同期 (sessionoptions に globals が含まれている場合)
+  M.sync_to_global()
+end
+
+function M.sync_to_global()
+  local data = {
+    names = {},
+    buffers = {},
+    currents = {}
+  }
+  local tabs = vim.api.nvim_list_tabpages()
+  for i, tab_handle in ipairs(tabs) do
+    local s = M.state.tabs[tab_handle]
+    if s then
+      data.names[i] = s.name
+      data.buffers[i] = s.buffers
+      data.currents[i] = s.current
+    else
+      local ok, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_name')
+      if not ok then
+        ok, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'title')
+      end
+      data.names[i] = ok and name or nil
+    end
+  end
+  -- テーブルはセッションに保存されないため、JSON文字列として保存する
+  vim.g.TabflowStateJson = vim.json.encode(data)
+end
+
+function M.restore_from_global()
+  local json = vim.g.TabflowStateJson
+  if not json or json == '' then
+    return
+  end
+
+  local ok, data = pcall(vim.json.decode, json)
+  if not ok or not data then
+    return
+  end
+
+  local names = data.names or {}
+  local buffers = data.buffers or {}
+  local currents = data.currents or {}
+
+  local tabs = vim.api.nvim_list_tabpages()
+  -- JSONデコード後はインデックスが文字列の数字になる場合があるため調整
+  for i = 1, #tabs do
+    local name = names[i] or names[tostring(i)]
+    local tab_handle = tabs[i]
+    M.ensure_tab(tab_handle)
+    local s = M.state.tabs[tab_handle]
+    if s then
+      if name and name ~= '' then
+        s.name = name
+      end
+      local bufs = buffers[i] or buffers[tostring(i)]
+      if bufs then
+        s.buffers = bufs
+      end
+      local cur = currents[i] or currents[tostring(i)]
+      if cur then
+        s.current = cur
+      end
+      -- 変数に書き戻し
+      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
+      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
+      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
+      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
+    end
+  end
 end
 
 return M
