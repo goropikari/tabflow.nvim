@@ -1,7 +1,7 @@
 local M = {}
 
 M.state = {
-  mode = 'buffers', -- "tabs" or "buffers"
+  mode = 'tabs', -- "tabs" or "buffers"
 
   drag = {
     active = false,
