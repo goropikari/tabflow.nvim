@@ -1,7 +1,8 @@
 local M = {}
 
 function M.setup(opts)
-  -- Options could be handled here in the future
+  opts = opts or {}
+  opts.commands = opts.commands or {}
 
   require('tabflow.highlights').setup()
   require('tabflow.autocmd').setup()
@@ -21,42 +22,53 @@ function M.setup(opts)
   vim.o.showtabline = 2
   vim.o.tabline = "%!v:lua.require'tabflow.tabline'.render()"
 
-  -- Define user commands
+  -- Register only configured commands
   local actions = require('tabflow.actions')
-  vim.api.nvim_create_user_command('TabflowTabsMode', actions.enter_tabs_mode, {})
-  vim.api.nvim_create_user_command('TabflowBuffersMode', actions.enter_buffers_mode, {})
-  vim.api.nvim_create_user_command('TabflowToggleMode', actions.toggle_mode, {})
-  vim.api.nvim_create_user_command('TabflowRenameTab', function(args)
-    actions.rename_tab(vim.api.nvim_get_current_tabpage(), args.args)
-  end, { nargs = 1 })
-  vim.api.nvim_create_user_command('TabflowNewTab', function()
-    vim.cmd('tabnew')
-    actions.enter_buffers_mode()
-  end, {})
-  vim.api.nvim_create_user_command('TabflowCloseTab', function()
-    actions.close_tab(vim.api.nvim_get_current_tabpage())
-  end, {})
-  vim.api.nvim_create_user_command('TabflowCloseBuffer', function()
-    actions.close_buffer(vim.api.nvim_get_current_buf())
-  end, {})
-  vim.api.nvim_create_user_command('TabflowNextTab', actions.next_tab, {})
-  vim.api.nvim_create_user_command('TabflowPrevTab', actions.prev_tab, {})
-  vim.api.nvim_create_user_command('TabflowNextBuffer', actions.next_buffer, {})
-  vim.api.nvim_create_user_command('TabflowPrevBuffer', actions.prev_buffer, {})
-  vim.api.nvim_create_user_command('TabflowSetGitBranchName', function(args)
-    require('tabflow.state').set_tab_name_to_git_branch()
-  end, { nargs = 0 })
-  vim.api.nvim_create_user_command('TabflowOpenWorktree', function(args)
-    actions.select_worktree(args.args)
-  end, {
-    nargs = '?',
-    complete = function()
-      local worktrees = require('tabflow.state').get_git_worktrees()
-      return vim.tbl_map(function(wt)
-        return wt.branch
-      end, worktrees)
-    end,
-  })
+  local command_defs = {
+    TabflowTabsMode = { fn = actions.enter_tabs_mode, opts = {} },
+    TabflowBuffersMode = { fn = actions.enter_buffers_mode, opts = {} },
+    TabflowToggleMode = { fn = actions.toggle_mode, opts = {} },
+    TabflowNextTab = { fn = actions.next_tab, opts = {} },
+    TabflowPrevTab = { fn = actions.prev_tab, opts = {} },
+    TabflowNextBuffer = { fn = actions.next_buffer, opts = {} },
+    TabflowPrevBuffer = { fn = actions.prev_buffer, opts = {} },
+    TabflowRenameTab = { fn = function(args)
+      actions.rename_tab(vim.api.nvim_get_current_tabpage(), args.args)
+    end, opts = { nargs = 1 } },
+    TabflowSetGitBranchName = { fn = function()
+      require('tabflow.state').set_tab_name_to_git_branch()
+    end, opts = { nargs = 0 } },
+    TabflowNewTab = { fn = function()
+      vim.cmd('tabnew')
+      actions.enter_buffers_mode()
+    end, opts = {} },
+    TabflowCloseTab = { fn = function()
+      actions.close_tab(vim.api.nvim_get_current_tabpage())
+    end, opts = {} },
+    TabflowCloseBuffer = { fn = function()
+      actions.close_buffer(vim.api.nvim_get_current_buf())
+    end, opts = {} },
+    TabflowOpenWorktree = { fn = function(args)
+      actions.select_worktree(args.args)
+    end, opts = {
+      nargs = '?',
+      complete = function()
+        local worktrees = require('tabflow.state').get_git_worktrees()
+        return vim.tbl_map(function(wt)
+          return wt.branch
+        end, worktrees)
+      end,
+    } },
+  }
+
+  if type(opts.commands) == 'table' then
+    for _, cmd_name in ipairs(opts.commands) do
+      local cmd_def = command_defs[cmd_name]
+      if cmd_def then
+        vim.api.nvim_create_user_command(cmd_name, cmd_def.fn, cmd_def.opts)
+      end
+    end
+  end
 end
 
 return M
