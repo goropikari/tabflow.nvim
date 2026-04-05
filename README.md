@@ -80,3 +80,107 @@ Example:
 ```lua
 vim.api.nvim_set_hl(0, "IdeTablineActive", { fg = "#7aa2f7", bold = true, underline = true })
 ```
+
+## 🔌 Lua API
+
+You can use the following functions in your Lua configuration:
+
+### Mode Switching
+
+```lua
+-- Get current mode ('tabs' or 'buffers')
+require('tabflow.state').get_mode()
+
+-- Switch to Tab mode
+require('tabflow.actions').enter_tabs_mode()
+
+-- Switch to Buffer mode
+require('tabflow.actions').enter_buffers_mode()
+
+-- Toggle between modes
+require('tabflow.actions').toggle_mode()
+```
+
+### Navigation
+
+```lua
+-- Switch to next/previous tab
+require('tabflow.actions').next_tab()
+require('tabflow.actions').prev_tab()
+
+-- Switch to next/previous buffer in current workspace
+require('tabflow.actions').next_buffer()
+require('tabflow.actions').prev_buffer()
+
+-- Switch to a specific tab (by tab handle)
+require('tabflow.actions').switch_to_tab(tab_handle)
+
+-- Switch to a specific buffer (by bufnr)
+require('tabflow.actions').switch_to_buffer(bufnr)
+```
+
+### Tab Management
+
+```lua
+-- Rename a tab
+require('tabflow.actions').rename_tab(tab_handle, name)
+
+-- Open rename prompt for a tab
+require('tabflow.actions').prompt_rename_tab(tab_handle)
+
+-- Close a tab (workspace)
+require('tabflow.actions').close_tab(tab_handle)
+
+-- Remove a buffer from current workspace
+require('tabflow.actions').close_buffer(bufnr)
+
+-- Open a git worktree in a new tab
+require('tabflow.actions').select_worktree(branch_name) -- or nil for interactive selection
+```
+
+### Utility
+
+```lua
+-- Check if a buffer is in any tab
+require('tabflow.actions').is_buffer_in_any_tab(bufnr)
+
+-- Reorder tabs
+require('tabflow.actions').reorder_tabs(source_tab, target_index)
+
+-- Reorder buffers within a tab
+require('tabflow.actions').reorder_buffers(tab_handle, source_index, target_index)
+
+-- Move a buffer between tabs
+require('tabflow.actions').move_buffer_between_tabs(bufnr, source_tab, target_tab, target_index)
+```
+
+### Example: Custom Keybindings
+
+```lua
+vim.keymap.set('n', '<leader>tt', require('tabflow.actions').toggle_mode, { desc = 'Toggle tab/buffer mode' })
+vim.keymap.set('n', '<leader>tn', require('tabflow.actions').next_tab, { desc = 'Next tab' })
+vim.keymap.set('n', '<leader>tp', require('tabflow.actions').prev_tab, { desc = 'Previous tab' })
+vim.keymap.set('n', '<leader>bn', require('tabflow.actions').next_buffer, { desc = 'Next buffer' })
+vim.keymap.set('n', '<leader>bp', require('tabflow.actions').prev_buffer, { desc = 'Previous buffer' })
+
+-- Move left/right depending on current mode (tabs or buffers)
+vim.keymap.set('n', '<C-A-h>', function()
+  local state = require('tabflow.state')
+  local actions = require('tabflow.actions')
+  if state.get_mode() == 'tabs' then
+    actions.prev_tab()
+  else
+    actions.prev_buffer()
+  end
+end, { desc = 'Move left (tab/buffer)' })
+
+vim.keymap.set('n', '<C-A-l>', function()
+  local state = require('tabflow.state')
+  local actions = require('tabflow.actions')
+  if state.get_mode() == 'tabs' then
+    actions.next_tab()
+  else
+    actions.next_buffer()
+  end
+end, { desc = 'Move right (tab/buffer)' })
+```

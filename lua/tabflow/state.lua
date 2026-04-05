@@ -296,7 +296,7 @@ function M.sync_to_global()
   local data = {
     names = {},
     buffers = {},
-    currents = {}
+    currents = {},
   }
   local tabs = vim.api.nvim_list_tabpages()
   for i, tab_handle in ipairs(tabs) do
@@ -358,6 +358,10 @@ function M.restore_from_global()
       pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
     end
   end
+end
+
+function M.get_mode()
+  return M.state.mode
 end
 
 return M
