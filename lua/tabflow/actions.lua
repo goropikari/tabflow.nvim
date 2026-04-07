@@ -2,12 +2,26 @@ local state = require('tabflow.state')
 
 local M = {}
 
-function M.toggle_mode()
-  if state.state.mode == 'tabs' then
-    state.state.mode = 'buffers'
-  else
-    state.state.mode = 'tabs'
+local function navigate_list(list, current_item, direction)
+  if #list == 0 then
+    return nil
   end
+  for i, item in ipairs(list) do
+    if item == current_item then
+      local next_idx = i + direction
+      if next_idx > #list then
+        next_idx = 1
+      elseif next_idx < 1 then
+        next_idx = #list
+      end
+      return list[next_idx]
+    end
+  end
+  return list[1]
+end
+
+function M.toggle_mode()
+  state.state.mode = state.state.mode == 'tabs' and 'buffers' or 'tabs'
   vim.cmd('redrawtabline')
 end
 
@@ -68,15 +82,10 @@ function M.close_buffer(bufnr)
   local current_tab = vim.api.nvim_get_current_tabpage()
   state.remove_buffer(current_tab, bufnr)
 
-  -- If the buffer was active in the current window, switch to another one from the workspace
   if vim.api.nvim_get_current_buf() == bufnr then
     local s = state.get_tab_state(current_tab)
     if #s.buffers > 0 then
-      -- Switch to the new "current" buffer in state, or the last one
       vim.api.nvim_set_current_buf(s.current or s.buffers[#s.buffers])
-    else
-      -- No more buffers in this workspace, maybe switch to an empty buffer?
-      -- For now, let Neovim handle it or stay.
     end
   end
 
@@ -88,10 +97,10 @@ end
 
 function M.is_buffer_in_any_tab(bufnr)
   for _, s in pairs(state.state.tabs) do
-    for _, b in ipairs(s.buffers) do
-      if b == bufnr then
-        return true
-      end
+    if vim.iter(s.buffers):find(function(b)
+      return b == bufnr
+    end) then
+      return true
     end
   end
   return false
@@ -111,13 +120,9 @@ function M.reorder_tabs(source_tab, target_index)
     return
   end
 
-  -- target_index is 1-based. tabmove 0 moves to first, tabmove 1 moves to after 1st.
-  -- To move to position N (1-based), we use tabmove N-1.
-  -- When moving right, the source tab is removed first, so we need to adjust the target index
   local current_tab = vim.api.nvim_get_current_tabpage()
   vim.api.nvim_set_current_tabpage(source_tab)
 
-  -- 右方向に移動する場合、source が抜ける分 target_index を 1 つ減らす
   local move_pos = target_index - 1
   if source_idx < target_index then
     move_pos = target_index - 2
@@ -125,7 +130,6 @@ function M.reorder_tabs(source_tab, target_index)
 
   vim.cmd('tabmove ' .. move_pos)
 
-  -- Restore focus
   if vim.api.nvim_tabpage_is_valid(current_tab) then
     vim.api.nvim_set_current_tabpage(current_tab)
   end
@@ -155,15 +159,9 @@ end
 function M.next_tab()
   local current = vim.api.nvim_get_current_tabpage()
   local tabs = vim.api.nvim_list_tabpages()
-  for i, tab in ipairs(tabs) do
-    if tab == current then
-      local next_idx = i + 1
-      if next_idx > #tabs then
-        next_idx = 1
-      end
-      vim.api.nvim_set_current_tabpage(tabs[next_idx])
-      break
-    end
+  local next_tab = navigate_list(tabs, current, 1)
+  if next_tab then
+    vim.api.nvim_set_current_tabpage(next_tab)
   end
   vim.cmd('redrawtabline')
 end
@@ -171,15 +169,9 @@ end
 function M.prev_tab()
   local current = vim.api.nvim_get_current_tabpage()
   local tabs = vim.api.nvim_list_tabpages()
-  for i, tab in ipairs(tabs) do
-    if tab == current then
-      local prev_idx = i - 1
-      if prev_idx < 1 then
-        prev_idx = #tabs
-      end
-      vim.api.nvim_set_current_tabpage(tabs[prev_idx])
-      break
-    end
+  local prev_tab = navigate_list(tabs, current, -1)
+  if prev_tab then
+    vim.api.nvim_set_current_tabpage(prev_tab)
   end
   vim.cmd('redrawtabline')
 end
@@ -188,17 +180,11 @@ function M.next_buffer()
   local current_tab = vim.api.nvim_get_current_tabpage()
   local s = state.get_tab_state(current_tab)
   local current_buf = vim.api.nvim_get_current_buf()
-  for i, bufnr in ipairs(s.buffers) do
-    if bufnr == current_buf then
-      local next_idx = i + 1
-      if next_idx > #s.buffers then
-        next_idx = 1
-      end
-      vim.api.nvim_set_current_buf(s.buffers[next_idx])
-      s.current = s.buffers[next_idx]
-      state.save_tab_state(current_tab)
-      break
-    end
+  local next_buf = navigate_list(s.buffers, current_buf, 1)
+  if next_buf then
+    vim.api.nvim_set_current_buf(next_buf)
+    s.current = next_buf
+    state.save_tab_state(current_tab)
   end
   vim.cmd('redrawtabline')
 end
@@ -207,17 +193,11 @@ function M.prev_buffer()
   local current_tab = vim.api.nvim_get_current_tabpage()
   local s = state.get_tab_state(current_tab)
   local current_buf = vim.api.nvim_get_current_buf()
-  for i, bufnr in ipairs(s.buffers) do
-    if bufnr == current_buf then
-      local prev_idx = i - 1
-      if prev_idx < 1 then
-        prev_idx = #s.buffers
-      end
-      vim.api.nvim_set_current_buf(s.buffers[prev_idx])
-      s.current = s.buffers[prev_idx]
-      state.save_tab_state(current_tab)
-      break
-    end
+  local prev_buf = navigate_list(s.buffers, current_buf, -1)
+  if prev_buf then
+    vim.api.nvim_set_current_buf(prev_buf)
+    s.current = prev_buf
+    state.save_tab_state(current_tab)
   end
   vim.cmd('redrawtabline')
 end
@@ -262,7 +242,6 @@ function M.delete_other_buffers()
   local current_buf = vim.api.nvim_get_current_buf()
   local s = state.get_tab_state(current_tab)
 
-  -- Keep only the current buffer
   local to_delete = vim.tbl_filter(function(b)
     return b ~= current_buf and vim.api.nvim_buf_is_valid(b)
   end, s.buffers)

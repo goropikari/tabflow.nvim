@@ -10,14 +10,14 @@ function M.setup(opts)
   end
 
   require('tabflow.highlights').setup()
-  require('tabflow.autocmd').setup()
+  local autocmd = require('tabflow.autocmd')
+  autocmd.setup()
   require('tabflow.mouse').setup()
 
-  -- Add current buffer at startup
-  local state = require('tabflow.state')
+  -- Add current buffer at startup if it's a normal file
   local bufnr = vim.api.nvim_get_current_buf()
-  local current_tab = vim.api.nvim_get_current_tabpage()
-  if require('tabflow.autocmd').is_normal_file_buffer(bufnr) then
+  if require('tabflow.util').is_normal_file_buffer(bufnr) then
+    local current_tab = vim.api.nvim_get_current_tabpage()
     state.add_buffer(current_tab, bufnr)
     local s = state.get_tab_state(current_tab)
     s.current = bufnr

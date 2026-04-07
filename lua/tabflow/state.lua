@@ -41,7 +41,6 @@ function M.ensure_tab(tab_handle)
       return
     end
 
-    -- title (一般的に使われる) または tabflow_name から読み込み
     local ok_name, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'title')
     if not ok_name then
       ok_name, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_name')
@@ -60,21 +59,12 @@ function M.ensure_tab(tab_handle)
       current = nil
     end
 
-    -- 名前が設定されていない場合、git branch 名をデフォルトにする
+    -- Use git branch name as default if no name set
     if not name or name:match('^Tab %d+$') then
-      local root = vim.fn.system('git -C ' .. vim.fn.shellescape(vim.fn.getcwd()) .. ' rev-parse --show-toplevel 2>/dev/null')
-      root = root:gsub('%s+$', '')
-      if root ~= '' then
-        local branch = vim.fn.system('git -C ' .. vim.fn.shellescape(root) .. ' symbolic-ref --short HEAD 2>/dev/null')
-        branch = branch:gsub('%s+$', '')
-        if branch == '' or branch == 'HEAD' then
-          local hash = vim.fn.system('git -C ' .. vim.fn.shellescape(root) .. ' rev-parse --short HEAD 2>/dev/null')
-          hash = hash:gsub('%s+$', '')
-          branch = hash ~= '' and hash or nil
-        end
-        if branch and branch ~= '' then
-          name = branch
-        end
+      local util = require('tabflow.util')
+      local branch = util.git_branch()
+      if branch then
+        name = branch
       end
     end
 
@@ -93,7 +83,6 @@ function M.add_buffer(tab_handle, bufnr)
     return
   end
 
-  -- Use vim.iter for 0.11 style
   if vim.iter(s.buffers):find(function(b)
     return b == bufnr
   end) then
@@ -110,28 +99,24 @@ function M.remove_buffer(tab_handle, bufnr)
     return
   end
 
-  -- Check if buffer is still valid before removing
-  local is_valid = vim.api.nvim_buf_is_valid(bufnr)
-
+  local removed = false
   for i, b in ipairs(s.buffers) do
     if b == bufnr then
-      -- Only remove if buffer is still valid
-      if is_valid then
-        table.remove(s.buffers, i)
-      end
+      table.remove(s.buffers, i)
+      removed = true
       break
     end
   end
 
-  -- Update current buffer if needed
-  if s.current and not is_valid then
-    s.current = s.buffers[#s.buffers] or nil
-    M.save_tab_state(tab_handle)
-  elseif not is_valid and #s.buffers == 0 then
-    -- Last buffer was removed, clear current
-    s.current = nil
-    M.save_tab_state(tab_handle)
+  if not removed then
+    return
   end
+
+  -- Update current buffer if it was the one removed
+  if s.current == bufnr then
+    s.current = s.buffers[#s.buffers] or nil
+  end
+  M.save_tab_state(tab_handle)
 end
 
 function M.remove_buffer_everywhere(bufnr)
@@ -142,12 +127,10 @@ end
 
 function M.remove_tab_state(tab_handle)
   if vim.api.nvim_tabpage_is_valid(tab_handle) then
-    -- Clean up tabpage variables if valid
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_name')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_buffers')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_current')
   end
-  -- Always remove from internal state, even if tab is invalid
   M.state.tabs[tab_handle] = nil
 end
 
@@ -160,12 +143,10 @@ function M.get_tab_name(tab_handle)
     return 'Tab ?'
   end
 
-  -- 1. 明示的に設定された名前がある場合（Tab N というデフォルト形式以外）
   if s.name and not s.name:match('^Tab %d+$') then
     return s.name
   end
 
-  -- 2. タブ内で最後にアクティブだったバッファ名を使用
   if s.current and vim.api.nvim_buf_is_valid(s.current) then
     local bufname = vim.api.nvim_buf_get_name(s.current)
     if bufname ~= '' then
@@ -173,7 +154,6 @@ function M.get_tab_name(tab_handle)
     end
   end
 
-  -- 3. 代替として現在のタブ番号
   if vim.api.nvim_tabpage_is_valid(tab_handle) then
     return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
   end
@@ -190,36 +170,20 @@ end
 
 function M.set_tab_name_to_git_branch(tab_handle)
   tab_handle = tab_handle or vim.api.nvim_get_current_tabpage()
-  if not vim.api.nvim_tabpage_is_valid(tab_handle) then
+  local branch = require('tabflow.util').git_branch()
+  if not branch then
+    vim.notify('Not in a git repository or no branch found', vim.log.levels.WARN)
     return
-  end
-
-  local root = vim.fn.system('git -C ' .. vim.fn.shellescape(vim.fn.getcwd()) .. ' rev-parse --show-toplevel 2>/dev/null')
-  root = root:gsub('%s+$', '')
-  if root == '' then
-    vim.notify('Not in a git repository', vim.log.levels.WARN)
-    return
-  end
-
-  -- ブランチ名を取得（シンボリックリンクを追従）
-  local branch = vim.fn.system('git -C ' .. vim.fn.shellescape(root) .. ' symbolic-ref --short HEAD 2>/dev/null')
-  branch = branch:gsub('%s+$', '')
-
-  -- シンボリック参照が失敗した場合（detached HEAD など）、short hash を使用
-  if branch == '' or branch == 'HEAD' then
-    local hash = vim.fn.system('git -C ' .. vim.fn.shellescape(root) .. ' rev-parse --short HEAD 2>/dev/null')
-    hash = hash:gsub('%s+$', '')
-    branch = hash ~= '' and hash or 'unknown'
   end
 
   M.rename_tab(tab_handle, branch)
   vim.cmd('redrawtabline')
 end
 
--- git worktree の一覧を取得
 function M.get_git_worktrees()
-  local root = vim.fn.system('git rev-parse --show-toplevel 2>/dev/null'):gsub('%s+$', '')
-  if root == '' then
+  local util = require('tabflow.util')
+  local root = util.git_root()
+  if not root then
     return {}
   end
 
@@ -227,7 +191,6 @@ function M.get_git_worktrees()
   local worktrees = {}
 
   for line in output:gmatch('[^\n]+') do
-    -- 形式：/path/to/dir <commit> [branch]
     local path = line:match('^(%S+)')
     local branch = line:match('%[([^%]]+)%]')
     if path and branch then
@@ -241,12 +204,10 @@ function M.get_git_worktrees()
   return worktrees
 end
 
--- 指定したブランチの worktree に移動して新規タブ作成
 function M.open_worktree_tab(branch_name)
   local worktrees = M.get_git_worktrees()
   local target = nil
 
-  -- 既存の worktree を探す
   for _, wt in ipairs(worktrees) do
     if wt.branch == branch_name then
       target = wt
@@ -259,16 +220,9 @@ function M.open_worktree_tab(branch_name)
     return
   end
 
-  -- 現在のタブを保存
-  local original_tab = vim.api.nvim_get_current_tabpage()
-
-  -- 新規タブを作成
   vim.cmd('tabnew')
-
-  -- 新規タブのディレクトリを worktree に移動 (タブローカル)
   vim.cmd('tcd ' .. target.path)
 
-  -- タブ名をブランチ名に設定
   local tab_handle = vim.api.nvim_get_current_tabpage()
   M.rename_tab(tab_handle, branch_name)
 
@@ -287,12 +241,10 @@ function M.save_tab_state(tab_handle)
   end
 
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
-  -- title 変数 (t:title) も更新して他プラグインとも同期
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
 
-  -- セッション保存用にグローバル変数にも同期 (sessionoptions に globals が含まれている場合)
   M.sync_to_global()
 end
 
@@ -317,7 +269,6 @@ function M.sync_to_global()
       data.names[i] = ok and name or nil
     end
   end
-  -- テーブルはセッションに保存されないため、JSON文字列として保存する
   vim.g.TabflowStateJson = vim.json.encode(data)
 end
 
@@ -337,7 +288,6 @@ function M.restore_from_global()
   local currents = data.currents or {}
 
   local tabs = vim.api.nvim_list_tabpages()
-  -- JSONデコード後はインデックスが文字列の数字になる場合があるため調整
   for i = 1, #tabs do
     local name = names[i] or names[tostring(i)]
     local tab_handle = tabs[i]
@@ -355,7 +305,6 @@ function M.restore_from_global()
       if cur then
         s.current = cur
       end
-      -- 変数に書き戻し
       pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
       pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
       pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)

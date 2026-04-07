@@ -8,7 +8,7 @@ fmt:
 	dprint fmt
 
 lint:
-	typos -w
+	typos
 
 test:
 	@mkdir -p .tests/config .tests/data
