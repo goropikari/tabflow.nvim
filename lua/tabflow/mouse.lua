@@ -4,41 +4,26 @@ local tabline = require('tabflow.tabline')
 local M = {}
 
 function M.setup()
-  -- Global mappings for raw mouse event tracking
-  vim.keymap.set('', '<LeftMouse>', function()
-    M.on_left_mouse()
-    return '<LeftMouse>'
-  end, { expr = true })
+  local maps = {
+    ['<LeftMouse>'] = M.on_left_mouse,
+    ['<MiddleMouse>'] = M.on_middle_mouse,
+    ['<RightMouse>'] = M.on_right_mouse,
+    ['<ScrollWheelDown>'] = function()
+      M.on_scroll_wheel('down')
+    end,
+    ['<ScrollWheelUp>'] = function()
+      M.on_scroll_wheel('up')
+    end,
+    ['<LeftDrag>'] = M.on_left_drag,
+    ['<LeftRelease>'] = M.on_left_release,
+  }
 
-  vim.keymap.set('', '<MiddleMouse>', function()
-    M.on_middle_mouse()
-    return '<MiddleMouse>'
-  end, { expr = true })
-
-  vim.keymap.set('', '<RightMouse>', function()
-    M.on_right_mouse()
-    return '<RightMouse>'
-  end, { expr = true })
-
-  vim.keymap.set('', '<ScrollWheelDown>', function()
-    M.on_scroll_wheel('down')
-    return '<ScrollWheelDown>'
-  end, { expr = true })
-
-  vim.keymap.set('', '<ScrollWheelUp>', function()
-    M.on_scroll_wheel('up')
-    return '<ScrollWheelUp>'
-  end, { expr = true })
-
-  vim.keymap.set('', '<LeftDrag>', function()
-    M.on_left_drag()
-    return '<LeftDrag>'
-  end, { expr = true })
-
-  vim.keymap.set('', '<LeftRelease>', function()
-    M.on_left_release()
-    return '<LeftRelease>'
-  end, { expr = true })
+  for key, fn in pairs(maps) do
+    vim.keymap.set('', key, function()
+      fn()
+      return key
+    end, { expr = true })
+  end
 end
 
 function M.on_left_mouse()
@@ -91,19 +76,8 @@ function M.on_scroll_wheel(direction)
     vim.schedule(function()
       local actions = require('tabflow.actions')
       local s = require('tabflow.state')
-      if s.state.mode == 'tabs' then
-        if direction == 'down' then
-          actions.next_tab()
-        else
-          actions.prev_tab()
-        end
-      else
-        if direction == 'down' then
-          actions.next_buffer()
-        else
-          actions.prev_buffer()
-        end
-      end
+      local dir_val = (direction == 'down') and 1 or -1
+      actions.navigate(s.state.mode == 'tabs' and 'tab' or 'buffer', dir_val)
     end)
   end
 end

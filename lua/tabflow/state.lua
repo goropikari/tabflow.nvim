@@ -35,34 +35,28 @@ function M.get_tab_state(tab_handle)
   return M.state.tabs[tab_handle]
 end
 
+local function get_tab_var(tab_handle, name, default)
+  local ok, val = pcall(vim.api.nvim_tabpage_get_var, tab_handle, name)
+  return ok and val or default
+end
+
+local function get_tab_title(tab_handle)
+  return get_tab_var(tab_handle, 'tabflow_name', get_tab_var(tab_handle, 'title'))
+end
+
 function M.ensure_tab(tab_handle)
   if not M.state.tabs[tab_handle] then
     if not vim.api.nvim_tabpage_is_valid(tab_handle) then
       return
     end
 
-    local ok_name, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'title')
-    if not ok_name then
-      ok_name, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_name')
-    end
-    if not ok_name then
-      name = nil
-    end
-
-    local ok_bufs, buffers = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_buffers')
-    if not ok_bufs then
-      buffers = {}
-    end
-
-    local ok_cur, current = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_current')
-    if not ok_cur then
-      current = nil
-    end
+    local name = get_tab_title(tab_handle)
+    local buffers = get_tab_var(tab_handle, 'tabflow_buffers', {})
+    local current = get_tab_var(tab_handle, 'tabflow_current')
 
     -- Use git branch name as default if no name set
     if not name or name:match('^Tab %d+$') then
-      local util = require('tabflow.util')
-      local branch = util.git_branch()
+      local branch = require('tabflow.util').git_branch()
       if branch then
         name = branch
       end
@@ -134,13 +128,17 @@ function M.remove_tab_state(tab_handle)
   M.state.tabs[tab_handle] = nil
 end
 
+local function get_fallback_tab_name(tab_handle)
+  if vim.api.nvim_tabpage_is_valid(tab_handle) then
+    return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
+  end
+  return 'Tab ?'
+end
+
 function M.get_tab_name(tab_handle)
   local s = M.get_tab_state(tab_handle)
   if not s then
-    if vim.api.nvim_tabpage_is_valid(tab_handle) then
-      return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
-    end
-    return 'Tab ?'
+    return get_fallback_tab_name(tab_handle)
   end
 
   if s.name and not s.name:match('^Tab %d+$') then
@@ -154,10 +152,7 @@ function M.get_tab_name(tab_handle)
     end
   end
 
-  if vim.api.nvim_tabpage_is_valid(tab_handle) then
-    return 'Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)
-  end
-  return 'Tab ?'
+  return get_fallback_tab_name(tab_handle)
 end
 
 function M.rename_tab(tab_handle, name)
@@ -229,6 +224,16 @@ function M.open_worktree_tab(branch_name)
   vim.notify('Switched to worktree: ' .. target.path .. ' (' .. branch_name .. ')')
 end
 
+local function save_tab_state_to_vars(tab_handle, s)
+  if not vim.api.nvim_tabpage_is_valid(tab_handle) then
+    return
+  end
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
+end
+
 function M.save_tab_state(tab_handle)
   local s = M.state.tabs[tab_handle]
   if not s then
@@ -240,11 +245,7 @@ function M.save_tab_state(tab_handle)
     return
   end
 
-  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
-  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
-  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
-  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
-
+  save_tab_state_to_vars(tab_handle, s)
   M.sync_to_global()
 end
 
@@ -262,11 +263,7 @@ function M.sync_to_global()
       data.buffers[i] = s.buffers
       data.currents[i] = s.current
     else
-      local ok, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'tabflow_name')
-      if not ok then
-        ok, name = pcall(vim.api.nvim_tabpage_get_var, tab_handle, 'title')
-      end
-      data.names[i] = ok and name or nil
+      data.names[i] = get_tab_title(tab_handle)
     end
   end
   vim.g.TabflowStateJson = vim.json.encode(data)
@@ -305,10 +302,7 @@ function M.restore_from_global()
       if cur then
         s.current = cur
       end
-      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_name', s.name)
-      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
-      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
-      pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
+      save_tab_state_to_vars(tab_handle, s)
     end
   end
 end

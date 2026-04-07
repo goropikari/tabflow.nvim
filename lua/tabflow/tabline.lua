@@ -2,6 +2,8 @@ local state = require('tabflow.state')
 
 local M = {}
 
+local icon_cache = {}
+
 -- Get icon for a file
 local function get_icon(bufnr, base_hl)
   local has_devicons, devicons = pcall(require, 'nvim-web-devicons')
@@ -9,19 +11,21 @@ local function get_icon(bufnr, base_hl)
     return nil, nil
   end
 
-  local full_path = vim.api.nvim_buf_get_name(bufnr)
+  local full_path = vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) or ""
   local filename = vim.fn.fnamemodify(full_path, ':t')
   local ext = vim.fn.fnamemodify(filename, ':e')
   local icon, color = devicons.get_icon_color(filename, ext, { default = true })
 
   local icon_hl = nil
   if color and state.state.icons.color then
-    -- Generate a unique highlight group name based on color
-    local hl_name = 'IdeTablineIcon' .. color:gsub('#', '')
-    local base_attr = vim.api.nvim_get_hl(0, { name = base_hl, link = false })
-    local bg = base_attr.bg or base_attr.background
-
-    vim.api.nvim_set_hl(0, hl_name, { fg = color, bg = bg })
+    -- Generate a unique highlight group name based on color and base background
+    local hl_name = 'IdeTablineIcon' .. color:gsub('#', '') .. base_hl
+    if not icon_cache[hl_name] then
+      local base_attr = vim.api.nvim_get_hl(0, { name = base_hl, link = false })
+      local bg = base_attr.bg or base_attr.background
+      vim.api.nvim_set_hl(0, hl_name, { fg = color, bg = bg })
+      icon_cache[hl_name] = true
+    end
     icon_hl = hl_name
   end
 
@@ -52,10 +56,6 @@ end
 function M.build_items()
   local items = {}
 
-  -- Add mode toggle with current workspace name context
-  -- local current_tab = vim.api.nvim_get_current_tabpage()
-  -- local workspace_name = state.get_tab_name(current_tab)
-  -- local mode_label = (state.state.mode == 'tabs' and 'TABS' or ('WORKSPACE: ' .. workspace_name))
   local mode_label = (state.state.mode == 'tabs' and 'TABS' or 'BUFFERS')
 
   table.insert(items, {

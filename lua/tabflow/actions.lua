@@ -78,6 +78,23 @@ function M.close_tab(tab_handle)
   vim.cmd('redrawtabline')
 end
 
+function M.is_buffer_in_any_tab(bufnr)
+  for _, s in pairs(state.state.tabs) do
+    if vim.iter(s.buffers):find(function(b)
+      return b == bufnr
+    end) then
+      return true
+    end
+  end
+  return false
+end
+
+local function delete_if_unreferenced(bufnr)
+  if not M.is_buffer_in_any_tab(bufnr) then
+    vim.api.nvim_buf_delete(bufnr, { force = false })
+  end
+end
+
 function M.close_buffer(bufnr)
   local current_tab = vim.api.nvim_get_current_tabpage()
   state.remove_buffer(current_tab, bufnr)
@@ -89,21 +106,8 @@ function M.close_buffer(bufnr)
     end
   end
 
-  if not M.is_buffer_in_any_tab(bufnr) then
-    vim.api.nvim_buf_delete(bufnr, { force = false })
-  end
+  delete_if_unreferenced(bufnr)
   vim.cmd('redrawtabline')
-end
-
-function M.is_buffer_in_any_tab(bufnr)
-  for _, s in pairs(state.state.tabs) do
-    if vim.iter(s.buffers):find(function(b)
-      return b == bufnr
-    end) then
-      return true
-    end
-  end
-  return false
 end
 
 function M.reorder_tabs(source_tab, target_index)
@@ -156,50 +160,42 @@ function M.move_buffer_between_tabs(bufnr, source_tab, target_tab, target_index)
   vim.cmd('redrawtabline')
 end
 
-function M.next_tab()
-  local current = vim.api.nvim_get_current_tabpage()
-  local tabs = vim.api.nvim_list_tabpages()
-  local next_tab = navigate_list(tabs, current, 1)
-  if next_tab then
-    vim.api.nvim_set_current_tabpage(next_tab)
+function M.navigate(kind, direction)
+  if kind == 'tab' then
+    local current = vim.api.nvim_get_current_tabpage()
+    local tabs = vim.api.nvim_list_tabpages()
+    local target = navigate_list(tabs, current, direction)
+    if target then
+      vim.api.nvim_set_current_tabpage(target)
+    end
+  else
+    local current_tab = vim.api.nvim_get_current_tabpage()
+    local s = state.get_tab_state(current_tab)
+    local current_buf = vim.api.nvim_get_current_buf()
+    local target = navigate_list(s.buffers, current_buf, direction)
+    if target then
+      vim.api.nvim_set_current_buf(target)
+      s.current = target
+      state.save_tab_state(current_tab)
+    end
   end
   vim.cmd('redrawtabline')
+end
+
+function M.next_tab()
+  M.navigate('tab', 1)
 end
 
 function M.prev_tab()
-  local current = vim.api.nvim_get_current_tabpage()
-  local tabs = vim.api.nvim_list_tabpages()
-  local prev_tab = navigate_list(tabs, current, -1)
-  if prev_tab then
-    vim.api.nvim_set_current_tabpage(prev_tab)
-  end
-  vim.cmd('redrawtabline')
+  M.navigate('tab', -1)
 end
 
 function M.next_buffer()
-  local current_tab = vim.api.nvim_get_current_tabpage()
-  local s = state.get_tab_state(current_tab)
-  local current_buf = vim.api.nvim_get_current_buf()
-  local next_buf = navigate_list(s.buffers, current_buf, 1)
-  if next_buf then
-    vim.api.nvim_set_current_buf(next_buf)
-    s.current = next_buf
-    state.save_tab_state(current_tab)
-  end
-  vim.cmd('redrawtabline')
+  M.navigate('buffer', 1)
 end
 
 function M.prev_buffer()
-  local current_tab = vim.api.nvim_get_current_tabpage()
-  local s = state.get_tab_state(current_tab)
-  local current_buf = vim.api.nvim_get_current_buf()
-  local prev_buf = navigate_list(s.buffers, current_buf, -1)
-  if prev_buf then
-    vim.api.nvim_set_current_buf(prev_buf)
-    s.current = prev_buf
-    state.save_tab_state(current_tab)
-  end
-  vim.cmd('redrawtabline')
+  M.navigate('buffer', -1)
 end
 
 function M.select_worktree(branch_name)
@@ -248,9 +244,7 @@ function M.delete_other_buffers()
 
   for _, bufnr in ipairs(to_delete) do
     state.remove_buffer(current_tab, bufnr)
-    if not M.is_buffer_in_any_tab(bufnr) then
-      vim.api.nvim_buf_delete(bufnr, { force = false })
-    end
+    delete_if_unreferenced(bufnr)
   end
 
   s.buffers = { current_buf }
