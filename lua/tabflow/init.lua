@@ -48,6 +48,7 @@ function M.setup(opts)
     TabflowCloseBuffer = { fn = function()
       actions.close_buffer(vim.api.nvim_get_current_buf())
     end, opts = {} },
+    TabflowDeleteOtherBuffers = { fn = actions.delete_other_buffers, opts = {} },
     TabflowOpenWorktree = { fn = function(args)
       actions.select_worktree(args.args)
     end, opts = {

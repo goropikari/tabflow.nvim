@@ -19,6 +19,7 @@ M.HL = {
   active = 'IdeTablineActive',
   inactive = 'IdeTablineInactive',
   fill = 'IdeTablineFill',
+  separator = 'IdeTablineSeparator',
   modified = 'IdeTablineModified',
   hover = 'IdeTablineHover',
   icon_color = 'IdeTablineIconColor',
@@ -180,12 +181,20 @@ function M.render_items(items)
     if start_idx > 1 then
       res = res .. '%#' .. M.HL.fill .. '#.. '
       current_col = current_col + 3
+    elseif mode_toggle_item then
+      res = res .. '%#' .. M.HL.separator .. '#│'
+      current_col = current_col + 1
     end
 
     for i = start_idx, end_idx do
       local item = other_items[i]
       if item then
         local hl = item.active and M.HL.active or M.HL.inactive
+
+        if i > start_idx then
+          res = res .. '%#' .. M.HL.separator .. '#│'
+          current_col = current_col + 1
+        end
 
         if state.state.drag.active and state.state.drag.hover_target then
           if state.state.drag.hover_target.kind == item.kind and state.state.drag.hover_target.id == item.id then

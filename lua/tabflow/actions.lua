@@ -257,4 +257,27 @@ function M.select_worktree(branch_name)
   end)
 end
 
+function M.delete_other_buffers()
+  local current_tab = vim.api.nvim_get_current_tabpage()
+  local current_buf = vim.api.nvim_get_current_buf()
+  local s = state.get_tab_state(current_tab)
+
+  -- Keep only the current buffer
+  local to_delete = vim.tbl_filter(function(b)
+    return b ~= current_buf and vim.api.nvim_buf_is_valid(b)
+  end, s.buffers)
+
+  for _, bufnr in ipairs(to_delete) do
+    state.remove_buffer(current_tab, bufnr)
+    if not M.is_buffer_in_any_tab(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = false })
+    end
+  end
+
+  s.buffers = { current_buf }
+  s.current = current_buf
+  state.save_tab_state(current_tab)
+  vim.cmd('redrawtabline')
+end
+
 return M
