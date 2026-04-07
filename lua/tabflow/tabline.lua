@@ -3,16 +3,29 @@ local state = require('tabflow.state')
 local M = {}
 
 -- Get icon for a file
-local function get_icon(bufnr)
+local function get_icon(bufnr, base_hl)
   local has_devicons, devicons = pcall(require, 'nvim-web-devicons')
   if not has_devicons then
-    return nil
+    return nil, nil
   end
 
-  local filename = vim.api.nvim_buf_get_name(bufnr)
+  local full_path = vim.api.nvim_buf_get_name(bufnr)
+  local filename = vim.fn.fnamemodify(full_path, ':t')
   local ext = vim.fn.fnamemodify(filename, ':e')
   local icon, color = devicons.get_icon_color(filename, ext, { default = true })
-  return icon, color
+
+  local icon_hl = nil
+  if color and state.state.icons.color then
+    -- Generate a unique highlight group name based on color
+    local hl_name = 'IdeTablineIcon' .. color:gsub('#', '')
+    local base_attr = vim.api.nvim_get_hl(0, { name = base_hl, link = false })
+    local bg = base_attr.bg or base_attr.background
+
+    vim.api.nvim_set_hl(0, hl_name, { fg = color, bg = bg })
+    icon_hl = hl_name
+  end
+
+  return icon, icon_hl
 end
 
 M.HL = {
@@ -129,14 +142,16 @@ function M.render_items(items)
   -- 2. Calculate widths and find active item for viewport logic
   local active_idx = 1
   for i, item in ipairs(other_items) do
-    local icon = ''
+    local hl = item.active and M.HL.active or M.HL.inactive
+    local icon_char, icon_hl = nil, nil
     if item.kind == 'buffer' and item.id then
-      local icon_char = get_icon(item.id)
-      if icon_char then
-        icon = icon_char .. ' '
-      end
+      icon_char, icon_hl = get_icon(item.id, hl)
     end
-    item.full_label = ' ' .. icon .. item.label .. ' '
+
+    item.icon_char = icon_char
+    item.icon_hl = icon_hl
+    local icon_str = icon_char and (icon_char .. ' ') or ''
+    item.full_label = ' ' .. icon_str .. item.label .. ' '
     item.display_width = vim.fn.strdisplaywidth(item.full_label)
     if item.active then
       active_idx = i
@@ -202,7 +217,16 @@ function M.render_items(items)
           end
         end
 
-        res = res .. '%#' .. hl .. '#' .. item.full_label
+        if item.icon_char and item.icon_hl then
+          -- Re-check/re-set icon background if hl changed (e.g. hover)
+          local icon_char, icon_hl = get_icon(item.id, hl)
+
+          res = res .. '%#' .. hl .. '# ' -- leading space
+          res = res .. '%#' .. icon_hl .. '#' .. icon_char
+          res = res .. '%#' .. hl .. '# ' .. item.label .. ' ' -- icon-to-label space and rest
+        else
+          res = res .. '%#' .. hl .. '#' .. item.full_label
+        end
 
         table.insert(layout_items, {
           kind = item.kind,

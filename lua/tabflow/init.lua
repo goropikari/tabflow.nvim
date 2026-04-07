@@ -4,6 +4,11 @@ function M.setup(opts)
   opts = opts or {}
   opts.commands = opts.commands or {}
 
+  local state = require('tabflow.state')
+  if opts.icons then
+    state.state.icons = vim.tbl_extend('force', state.state.icons, opts.icons)
+  end
+
   require('tabflow.highlights').setup()
   require('tabflow.autocmd').setup()
   require('tabflow.mouse').setup()

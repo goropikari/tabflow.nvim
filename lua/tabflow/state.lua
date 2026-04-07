@@ -3,6 +3,10 @@ local M = {}
 M.state = {
   mode = 'tabs', -- "tabs" or "buffers"
 
+  icons = {
+    color = true,
+  },
+
   drag = {
     active = false,
     kind = nil, -- "tab" or "buffer"
