@@ -1,8 +1,58 @@
 local state = require('tabflow.state')
+local util = require('tabflow.util')
 
 local M = {}
 
 local icon_cache = {}
+
+-- Default formatter for tab labels
+local function default_tab_formatter(item)
+  local parts = { item.name }
+
+  if item.markers.pinned then
+    table.insert(parts, item.markers.pinned)
+  end
+  if item.markers.modified then
+    table.insert(parts, item.markers.modified)
+  elseif item.markers.unmodified then
+    table.insert(parts, item.markers.unmodified)
+  end
+
+  if item.diagnostics then
+    local diag_str = util.format_diagnostics(item.diagnostics, state.state.diagnostics.markers)
+    if diag_str then
+      table.insert(parts, diag_str)
+    end
+  end
+
+  return util.combine_elements(parts)
+end
+
+-- Default formatter for buffer labels
+local function default_buffer_formatter(item)
+  local parts = {}
+
+  if item.icon then
+    table.insert(parts, item.icon)
+  end
+
+  table.insert(parts, item.name)
+
+  if item.markers.modified then
+    table.insert(parts, item.markers.modified)
+  elseif item.markers.unmodified then
+    table.insert(parts, item.markers.unmodified)
+  end
+
+  if item.diagnostics then
+    local diag_str = util.format_diagnostics(item.diagnostics, state.state.diagnostics.markers)
+    if diag_str then
+      table.insert(parts, diag_str)
+    end
+  end
+
+  return util.combine_elements(parts)
+end
 
 -- Get icon for a file
 local function get_icon(bufnr, base_hl)
@@ -55,39 +105,6 @@ end
 
 function M.build_items()
   local items = {}
-  local function append_marker(label, marker)
-    if not marker or marker == '' then
-      return label
-    end
-    return label .. ' ' .. marker
-  end
-  local function append_diagnostics(label, counts)
-    if not state.state.diagnostics.enabled then
-      return label
-    end
-
-    local markers = state.state.diagnostics.markers
-    local parts = {}
-    if counts.error > 0 then
-      table.insert(parts, markers.error .. counts.error)
-    end
-    if counts.warn > 0 then
-      table.insert(parts, markers.warn .. counts.warn)
-    end
-    if counts.info > 0 then
-      table.insert(parts, markers.info .. counts.info)
-    end
-    if counts.hint > 0 then
-      table.insert(parts, markers.hint .. counts.hint)
-    end
-
-    if #parts == 0 then
-      return label
-    end
-
-    return label .. ' ' .. table.concat(parts, ' ')
-  end
-
   local mode_label = (state.state.mode == 'tabs' and 'TABS' or 'BUFFERS')
 
   table.insert(items, {
@@ -95,21 +112,57 @@ function M.build_items()
     label = '[' .. mode_label .. ']',
   })
 
+  local formatter = state.state.label_formatter
+
   if state.state.mode == 'tabs' then
     local tab_handles = vim.api.nvim_list_tabpages()
     local current_tab = vim.api.nvim_get_current_tabpage()
 
     for i, tab_handle in ipairs(tab_handles) do
-      local label = state.get_tab_name(tab_handle)
-      if state.is_tab_pinned(tab_handle) then
-        label = append_marker(label, state.state.markers.pinned)
-      end
-      if state.tab_has_modified_buffers(tab_handle) then
-        label = append_marker(label, state.state.markers.modified)
+      local name = state.get_tab_name(tab_handle)
+      local is_pinned = state.is_tab_pinned(tab_handle)
+      local has_modified = state.tab_has_modified_buffers(tab_handle)
+      local diagnostics = state.get_tab_diagnostic_counts(tab_handle)
+
+      local label
+      if formatter then
+        label = formatter({
+          type = 'tab',
+          id = tab_handle,
+          name = name,
+          markers = {
+            pinned = is_pinned and state.state.markers.pinned or nil,
+            modified = has_modified and state.state.markers.modified or nil,
+            unmodified = (not has_modified) and state.state.markers.unmodified or nil,
+          },
+          diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+        }, {
+          is_active = tab_handle == current_tab,
+          tab_handle = tab_handle,
+        })
+        -- Fallback to default if formatter returns nil/empty
+        if not label or label == '' then
+          label = default_tab_formatter({
+            name = name,
+            markers = {
+              pinned = is_pinned and state.state.markers.pinned,
+              modified = has_modified and state.state.markers.modified,
+              unmodified = (not has_modified) and state.state.markers.unmodified,
+            },
+            diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+          })
+        end
       else
-        label = append_marker(label, state.state.markers.unmodified)
+        label = default_tab_formatter({
+          name = name,
+          markers = {
+            pinned = is_pinned and state.state.markers.pinned,
+            modified = has_modified and state.state.markers.modified,
+            unmodified = (not has_modified) and state.state.markers.unmodified,
+          },
+          diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+        })
       end
-      label = append_diagnostics(label, state.get_tab_diagnostic_counts(tab_handle))
 
       table.insert(items, {
         kind = 'tab',
@@ -123,18 +176,53 @@ function M.build_items()
     local current_tab = vim.api.nvim_get_current_tabpage()
     local s = state.get_tab_state(current_tab)
     local current_buf = vim.api.nvim_get_current_buf()
-    local util = require('tabflow.util')
     local labels = util.get_unique_labels(s.buffers)
 
     for i, bufnr in ipairs(s.buffers) do
       if vim.api.nvim_buf_is_valid(bufnr) then
-        local label = labels[bufnr] or '[No Name]'
-        if vim.api.nvim_get_option_value('modified', { buf = bufnr }) then
-          label = append_marker(label, state.state.markers.modified)
+        local name = labels[bufnr] or '[No Name]'
+        local is_modified = vim.api.nvim_get_option_value('modified', { buf = bufnr })
+        local diagnostics = state.get_buffer_diagnostic_counts(bufnr)
+        local icon_char, _ = get_icon(bufnr, M.HL.inactive)
+
+        local label
+        if formatter then
+          label = formatter({
+            type = 'buffer',
+            id = bufnr,
+            name = name,
+            markers = {
+              modified = is_modified and state.state.markers.modified or nil,
+              unmodified = (not is_modified) and state.state.markers.unmodified or nil,
+            },
+            diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+            icon = icon_char,
+          }, {
+            is_active = bufnr == current_buf,
+          })
+          -- Fallback to default if formatter returns nil/empty
+          if not label or label == '' then
+            label = default_buffer_formatter({
+              name = name,
+              markers = {
+                modified = is_modified and state.state.markers.modified,
+                unmodified = (not is_modified) and state.state.markers.unmodified,
+              },
+              diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+              icon = icon_char,
+            })
+          end
         else
-          label = append_marker(label, state.state.markers.unmodified)
+          label = default_buffer_formatter({
+            name = name,
+            markers = {
+              modified = is_modified and state.state.markers.modified,
+              unmodified = (not is_modified) and state.state.markers.unmodified,
+            },
+            diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
+            icon = icon_char,
+          })
         end
-        label = append_diagnostics(label, state.get_buffer_diagnostic_counts(bufnr))
 
         table.insert(items, {
           kind = 'buffer',

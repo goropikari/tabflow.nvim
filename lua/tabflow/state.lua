@@ -1,5 +1,27 @@
+---@class TabflowState
 local M = {}
 
+---@class TabflowLabelItem
+---@field type 'tab'|'buffer'
+---@field id number tab handle or buffer number
+---@field name string base label name
+---@field markers { pinned?: string, modified?: string, unmodified?: string }
+---@field diagnostics? { error: number, warn: number, info: number, hint: number }
+---@field icon? string devicon for buffer items
+
+---@class TabflowLabelCtx
+---@field is_active boolean
+---@field tab_handle? number only for tab items
+
+---@class TabflowConfig
+---@field mode 'tabs'|'buffers'
+---@field icons { color: boolean }
+---@field markers { modified: string, unmodified: string, pinned: string }
+---@field diagnostics { enabled: boolean, markers: { error: string, warn: string, info: string, hint: string } }
+---@field label_formatter fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
+---@field drag TabflowDragState
+---@field layout { items: any[], revision: number }
+---@field tabs table<number, TabflowTabState>
 M.state = {
   mode = 'tabs', -- "tabs" or "buffers"
 
@@ -23,6 +45,12 @@ M.state = {
     },
   },
 
+  -- Optional function to format tab/buffer labels
+  -- Signature: formatter(item, ctx) -> string
+  -- item = { type, id, name, markers, diagnostics, icon }
+  -- ctx = { is_active, tab_handle? }
+  label_formatter = nil,
+
   drag = {
     active = false,
     kind = nil, -- "tab" or "buffer"
@@ -43,6 +71,14 @@ M.state = {
   tabs = {}, -- [tab_handle] = { name = string, buffers = { bufnr, ... }, current = bufnr }
 }
 
+---@class TabflowTabState
+---@field name string
+---@field buffers number[]
+---@field current? number
+---@field pinned? boolean
+
+---@param tab_handle number?
+---@return TabflowTabState
 function M.get_tab_state(tab_handle)
   tab_handle = tab_handle or vim.api.nvim_get_current_tabpage()
   if not M.state.tabs[tab_handle] then
@@ -51,15 +87,22 @@ function M.get_tab_state(tab_handle)
   return M.state.tabs[tab_handle]
 end
 
+---@param tab_handle number
+---@param name string
+---@param default any
+---@return any
 local function get_tab_var(tab_handle, name, default)
   local ok, val = pcall(vim.api.nvim_tabpage_get_var, tab_handle, name)
   return ok and val or default
 end
 
+---@param tab_handle number
+---@return string?
 local function get_tab_title(tab_handle)
   return get_tab_var(tab_handle, 'tabflow_name', get_tab_var(tab_handle, 'title'))
 end
 
+---@param tab_handle number
 function M.ensure_tab(tab_handle)
   if not M.state.tabs[tab_handle] then
     if not vim.api.nvim_tabpage_is_valid(tab_handle) then
@@ -89,6 +132,8 @@ function M.ensure_tab(tab_handle)
   end
 end
 
+---@param tab_handle number
+---@param bufnr number
 function M.add_buffer(tab_handle, bufnr)
   local s = M.get_tab_state(tab_handle)
   if not s then
@@ -105,6 +150,8 @@ function M.add_buffer(tab_handle, bufnr)
   M.save_tab_state(tab_handle)
 end
 
+---@param tab_handle number
+---@param bufnr number
 function M.remove_buffer(tab_handle, bufnr)
   local s = M.get_tab_state(tab_handle)
   if not s then
@@ -131,6 +178,7 @@ function M.remove_buffer(tab_handle, bufnr)
   M.save_tab_state(tab_handle)
 end
 
+---@param bufnr number
 function M.remove_buffer_everywhere(bufnr)
   for tab_handle, _ in pairs(M.state.tabs) do
     M.remove_buffer(tab_handle, bufnr)

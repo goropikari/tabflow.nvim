@@ -66,4 +66,47 @@ function M.is_normal_file_buffer(bufnr)
   return buflisted and buftype == ''
 end
 
+-- Format diagnostic counts into a string with markers
+function M.format_diagnostics(counts, markers)
+  if not counts then
+    return nil
+  end
+
+  markers = markers or { error = 'E', warn = 'W', info = 'I', hint = 'H' }
+  local parts = {}
+
+  if counts.error and counts.error > 0 then
+    table.insert(parts, markers.error .. counts.error)
+  end
+  if counts.warn and counts.warn > 0 then
+    table.insert(parts, markers.warn .. counts.warn)
+  end
+  if counts.info and counts.info > 0 then
+    table.insert(parts, markers.info .. counts.info)
+  end
+  if counts.hint and counts.hint > 0 then
+    table.insert(parts, markers.hint .. counts.hint)
+  end
+
+  if #parts == 0 then
+    return nil
+  end
+
+  return table.concat(parts, ' ')
+end
+
+-- Combine label elements with proper spacing
+function M.combine_elements(elements)
+  local parts = {}
+  for _, elem in ipairs(elements) do
+    if elem and elem ~= '' then
+      table.insert(parts, elem)
+    end
+  end
+  if #parts == 0 then
+    return ''
+  end
+  return table.concat(parts, ' ')
+end
+
 return M

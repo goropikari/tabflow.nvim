@@ -51,6 +51,30 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
         hint = "H",
       },
     },
+    -- Optional: Custom label formatter for full control over tab/buffer display
+    label_formatter = function(item, ctx)
+      -- item.type = 'tab' or 'buffer'
+      -- item.name = base name
+      -- item.markers = { pinned?, modified?, unmodified? }
+      -- item.diagnostics = { error, warn, info, hint } (if enabled)
+      -- item.icon = devicon (buffer mode only, if available)
+      -- ctx.is_active = true if this is the active tab/buffer
+      local parts = {}
+      if item.icon then
+        table.insert(parts, item.icon)
+      end
+      table.insert(parts, item.name)
+      if item.markers.pinned then
+        table.insert(parts, item.markers.pinned)
+      end
+      if item.markers.modified then
+        table.insert(parts, item.markers.modified)
+      end
+      if item.diagnostics and item.diagnostics.error > 0 then
+        table.insert(parts, 'E' .. item.diagnostics.error)
+      end
+      return table.concat(parts, ' ')
+    end,
   },
 }
 ```
@@ -180,6 +204,18 @@ require('tabflow.actions').reorder_buffers(tab_handle, source_index, target_inde
 
 -- Move a buffer between tabs
 require('tabflow.actions').move_buffer_between_tabs(bufnr, source_tab, target_tab, target_index)
+```
+
+### Formatter Helpers
+
+```lua
+local util = require('tabflow.util')
+
+-- Format diagnostic counts into a string (e.g., "E2 W1")
+util.format_diagnostics(counts, markers)
+
+-- Combine label elements with proper spacing
+util.combine_elements({ icon, name, marker, diagnostics })
 ```
 
 ### Example: Custom Keybindings

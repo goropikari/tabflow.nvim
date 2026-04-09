@@ -14,6 +14,9 @@ function M.setup(opts)
   if opts.diagnostics then
     state.state.diagnostics = vim.tbl_deep_extend('force', state.state.diagnostics, opts.diagnostics)
   end
+  if opts.label_formatter then
+    state.state.label_formatter = opts.label_formatter
+  end
 
   require('tabflow.highlights').setup()
   local autocmd = require('tabflow.autocmd')
