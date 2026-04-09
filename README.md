@@ -1,5 +1,7 @@
 # tabflow.nvim
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/goropikari/tabflow.nvim)
+
 An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the tabline as a hierarchical interactive UI.
 
 ## 🚀 Features
