@@ -8,6 +8,9 @@ function M.setup(opts)
   if opts.icons then
     state.state.icons = vim.tbl_extend('force', state.state.icons, opts.icons)
   end
+  if opts.markers then
+    state.state.markers = vim.tbl_extend('force', state.state.markers, opts.markers)
+  end
 
   require('tabflow.highlights').setup()
   local autocmd = require('tabflow.autocmd')

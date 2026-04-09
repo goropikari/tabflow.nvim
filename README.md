@@ -35,7 +35,12 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
 {
   "goropikari/tabflow.nvim",
   dependencies = { "nvim-tree/nvim-web-devicons" }, -- Optional, for icons
-  opts = {},
+  opts = {
+    markers = {
+      modified = "●",
+      unmodified = "",
+    },
+  },
 }
 ```
 

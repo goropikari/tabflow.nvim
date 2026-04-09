@@ -7,6 +7,11 @@ M.state = {
     color = true,
   },
 
+  markers = {
+    modified = '●',
+    unmodified = '',
+  },
+
   drag = {
     active = false,
     kind = nil, -- "tab" or "buffer"
@@ -153,6 +158,21 @@ function M.get_tab_name(tab_handle)
   end
 
   return get_fallback_tab_name(tab_handle)
+end
+
+function M.tab_has_modified_buffers(tab_handle)
+  local s = M.get_tab_state(tab_handle)
+  if not s then
+    return false
+  end
+
+  for _, bufnr in ipairs(s.buffers) do
+    if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_get_option_value('modified', { buf = bufnr }) then
+      return true
+    end
+  end
+
+  return false
 end
 
 function M.rename_tab(tab_handle, name)

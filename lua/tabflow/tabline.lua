@@ -55,6 +55,12 @@ end
 
 function M.build_items()
   local items = {}
+  local function append_marker(label, marker)
+    if not marker or marker == '' then
+      return label
+    end
+    return label .. ' ' .. marker
+  end
 
   local mode_label = (state.state.mode == 'tabs' and 'TABS' or 'BUFFERS')
 
@@ -68,10 +74,17 @@ function M.build_items()
     local current_tab = vim.api.nvim_get_current_tabpage()
 
     for i, tab_handle in ipairs(tab_handles) do
+      local label = state.get_tab_name(tab_handle)
+      if state.tab_has_modified_buffers(tab_handle) then
+        label = append_marker(label, state.state.markers.modified)
+      else
+        label = append_marker(label, state.state.markers.unmodified)
+      end
+
       table.insert(items, {
         kind = 'tab',
         id = tab_handle,
-        label = state.get_tab_name(tab_handle),
+        label = label,
         active = tab_handle == current_tab,
         index = i,
       })
@@ -87,7 +100,9 @@ function M.build_items()
       if vim.api.nvim_buf_is_valid(bufnr) then
         local label = labels[bufnr] or '[No Name]'
         if vim.api.nvim_get_option_value('modified', { buf = bufnr }) then
-          label = label .. ' ●'
+          label = append_marker(label, state.state.markers.modified)
+        else
+          label = append_marker(label, state.state.markers.unmodified)
         end
 
         table.insert(items, {
