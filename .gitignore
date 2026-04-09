@@ -1,4 +1,6 @@
 .claude/worktrees
+.codex
 .worktrees
 .tests
+nvim.log
 memo.md
