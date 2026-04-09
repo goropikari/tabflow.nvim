@@ -11,6 +11,9 @@ function M.setup(opts)
   if opts.markers then
     state.state.markers = vim.tbl_extend('force', state.state.markers, opts.markers)
   end
+  if opts.diagnostics then
+    state.state.diagnostics = vim.tbl_deep_extend('force', state.state.diagnostics, opts.diagnostics)
+  end
 
   require('tabflow.highlights').setup()
   local autocmd = require('tabflow.autocmd')

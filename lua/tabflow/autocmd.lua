@@ -58,6 +58,13 @@ function M.setup()
       vim.cmd('redrawtabline')
     end,
   })
+
+  vim.api.nvim_create_autocmd('DiagnosticChanged', {
+    group = group,
+    callback = function()
+      vim.cmd('redrawtabline')
+    end,
+  })
 end
 
 return M

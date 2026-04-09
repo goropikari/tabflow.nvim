@@ -21,6 +21,7 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
 - **Smart Labels**:
   - Automatically disambiguates duplicate filenames by showing parent directory segments.
   - Supports `nvim-web-devicons` for file icons.
+  - Can show diagnostic counts for buffers and tabs.
 - **Workspace Aware**: Tracks "last active buffer" per tab page, restoring it when you switch back.
 
 ## 📋 Requirements
@@ -40,6 +41,15 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
       modified = "●",
       unmodified = "",
       pinned = "[P]",
+    },
+    diagnostics = {
+      enabled = true,
+      markers = {
+        error = "E",
+        warn = "W",
+        info = "I",
+        hint = "H",
+      },
     },
   },
 }

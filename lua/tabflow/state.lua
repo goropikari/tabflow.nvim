@@ -13,6 +13,16 @@ M.state = {
     pinned = '[P]',
   },
 
+  diagnostics = {
+    enabled = true,
+    markers = {
+      error = 'E',
+      warn = 'W',
+      info = 'I',
+      hint = 'H',
+    },
+  },
+
   drag = {
     active = false,
     kind = nil, -- "tab" or "buffer"
@@ -202,6 +212,65 @@ function M.count_pinned_tabs()
     end
   end
   return count
+end
+
+local function count_diagnostics_for_buffer(bufnr)
+  local counts = {
+    error = 0,
+    warn = 0,
+    info = 0,
+    hint = 0,
+  }
+
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return counts
+  end
+
+  for _, diagnostic in ipairs(vim.diagnostic.get(bufnr)) do
+    if diagnostic.severity == vim.diagnostic.severity.ERROR then
+      counts.error = counts.error + 1
+    elseif diagnostic.severity == vim.diagnostic.severity.WARN then
+      counts.warn = counts.warn + 1
+    elseif diagnostic.severity == vim.diagnostic.severity.INFO then
+      counts.info = counts.info + 1
+    elseif diagnostic.severity == vim.diagnostic.severity.HINT then
+      counts.hint = counts.hint + 1
+    end
+  end
+
+  return counts
+end
+
+local function merge_diagnostic_counts(base, extra)
+  base.error = base.error + extra.error
+  base.warn = base.warn + extra.warn
+  base.info = base.info + extra.info
+  base.hint = base.hint + extra.hint
+  return base
+end
+
+function M.get_buffer_diagnostic_counts(bufnr)
+  return count_diagnostics_for_buffer(bufnr)
+end
+
+function M.get_tab_diagnostic_counts(tab_handle)
+  local s = M.get_tab_state(tab_handle)
+  local counts = {
+    error = 0,
+    warn = 0,
+    info = 0,
+    hint = 0,
+  }
+
+  if not s then
+    return counts
+  end
+
+  for _, bufnr in ipairs(s.buffers) do
+    merge_diagnostic_counts(counts, count_diagnostics_for_buffer(bufnr))
+  end
+
+  return counts
 end
 
 function M.rename_tab(tab_handle, name)

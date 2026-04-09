@@ -11,7 +11,7 @@ local function get_icon(bufnr, base_hl)
     return nil, nil
   end
 
-  local full_path = vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) or ""
+  local full_path = vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) or ''
   local filename = vim.fn.fnamemodify(full_path, ':t')
   local ext = vim.fn.fnamemodify(filename, ':e')
   local icon, color = devicons.get_icon_color(filename, ext, { default = true })
@@ -61,6 +61,32 @@ function M.build_items()
     end
     return label .. ' ' .. marker
   end
+  local function append_diagnostics(label, counts)
+    if not state.state.diagnostics.enabled then
+      return label
+    end
+
+    local markers = state.state.diagnostics.markers
+    local parts = {}
+    if counts.error > 0 then
+      table.insert(parts, markers.error .. counts.error)
+    end
+    if counts.warn > 0 then
+      table.insert(parts, markers.warn .. counts.warn)
+    end
+    if counts.info > 0 then
+      table.insert(parts, markers.info .. counts.info)
+    end
+    if counts.hint > 0 then
+      table.insert(parts, markers.hint .. counts.hint)
+    end
+
+    if #parts == 0 then
+      return label
+    end
+
+    return label .. ' ' .. table.concat(parts, ' ')
+  end
 
   local mode_label = (state.state.mode == 'tabs' and 'TABS' or 'BUFFERS')
 
@@ -83,6 +109,7 @@ function M.build_items()
       else
         label = append_marker(label, state.state.markers.unmodified)
       end
+      label = append_diagnostics(label, state.get_tab_diagnostic_counts(tab_handle))
 
       table.insert(items, {
         kind = 'tab',
@@ -107,6 +134,7 @@ function M.build_items()
         else
           label = append_marker(label, state.state.markers.unmodified)
         end
+        label = append_diagnostics(label, state.get_buffer_diagnostic_counts(bufnr))
 
         table.insert(items, {
           kind = 'buffer',
