@@ -75,6 +75,9 @@ function M.build_items()
 
     for i, tab_handle in ipairs(tab_handles) do
       local label = state.get_tab_name(tab_handle)
+      if state.is_tab_pinned(tab_handle) then
+        label = append_marker(label, state.state.markers.pinned)
+      end
       if state.tab_has_modified_buffers(tab_handle) then
         label = append_marker(label, state.state.markers.modified)
       else

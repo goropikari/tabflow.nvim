@@ -46,6 +46,24 @@ function M.setup(opts)
       end,
       opts = { nargs = 1 },
     },
+    TabflowTogglePinTab = {
+      fn = function()
+        actions.toggle_tab_pinned(vim.api.nvim_get_current_tabpage())
+      end,
+      opts = { nargs = 0 },
+    },
+    TabflowPinTab = {
+      fn = function()
+        actions.pin_tab(vim.api.nvim_get_current_tabpage())
+      end,
+      opts = { nargs = 0 },
+    },
+    TabflowUnpinTab = {
+      fn = function()
+        actions.unpin_tab(vim.api.nvim_get_current_tabpage())
+      end,
+      opts = { nargs = 0 },
+    },
     TabflowSetGitBranchName = {
       fn = function()
         require('tabflow.state').set_tab_name_to_git_branch()

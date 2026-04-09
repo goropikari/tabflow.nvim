@@ -13,6 +13,7 @@ describe('tabflow.actions', function()
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_name')
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_buffers')
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_current')
+    pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_pinned')
   end)
 
   it('can toggle between tabs and buffers mode', function()
@@ -87,5 +88,52 @@ describe('tabflow.actions', function()
     local tab = vim.api.nvim_get_current_tabpage()
     actions.rename_tab(tab, 'Research')
     assert.are.equal('Research', state.get_tab_name(tab))
+  end)
+
+  it('can pin and unpin a tab', function()
+    local first_tab = vim.api.nvim_get_current_tabpage()
+    vim.cmd('tabnew')
+    local second_tab = vim.api.nvim_get_current_tabpage()
+
+    actions.pin_tab(second_tab)
+
+    local tabs = vim.api.nvim_list_tabpages()
+    assert.is_true(state.is_tab_pinned(second_tab))
+    assert.are.equal(second_tab, tabs[1])
+    assert.are.equal(first_tab, tabs[2])
+
+    actions.unpin_tab(second_tab)
+
+    tabs = vim.api.nvim_list_tabpages()
+    assert.is_false(state.is_tab_pinned(second_tab))
+    assert.are.same({ second_tab, first_tab }, tabs)
+  end)
+
+  it('keeps pinned tabs before unpinned tabs during reorder', function()
+    local first_tab = vim.api.nvim_get_current_tabpage()
+    vim.cmd('tabnew')
+    local second_tab = vim.api.nvim_get_current_tabpage()
+    vim.cmd('tabnew')
+    local third_tab = vim.api.nvim_get_current_tabpage()
+
+    actions.pin_tab(first_tab)
+    actions.reorder_tabs(third_tab, 1)
+
+    local tabs = vim.api.nvim_list_tabpages()
+    assert.are.equal(first_tab, tabs[1])
+    assert.are.same({ first_tab, third_tab, second_tab }, tabs)
+  end)
+
+  it('does not close pinned tabs', function()
+    local first_tab = vim.api.nvim_get_current_tabpage()
+    vim.cmd('tabnew')
+    local second_tab = vim.api.nvim_get_current_tabpage()
+
+    actions.pin_tab(first_tab)
+    actions.close_tab(first_tab)
+
+    local tabs = vim.api.nvim_list_tabpages()
+    assert.are.same({ first_tab, second_tab }, tabs)
+    assert.is_true(state.is_tab_pinned(first_tab))
   end)
 end)

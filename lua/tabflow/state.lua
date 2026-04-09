@@ -10,6 +10,7 @@ M.state = {
   markers = {
     modified = '●',
     unmodified = '',
+    pinned = '[P]',
   },
 
   drag = {
@@ -58,6 +59,7 @@ function M.ensure_tab(tab_handle)
     local name = get_tab_title(tab_handle)
     local buffers = get_tab_var(tab_handle, 'tabflow_buffers', {})
     local current = get_tab_var(tab_handle, 'tabflow_current')
+    local pinned = get_tab_var(tab_handle, 'tabflow_pinned', false)
 
     -- Use git branch name as default if no name set
     if not name or name:match('^Tab %d+$') then
@@ -71,6 +73,7 @@ function M.ensure_tab(tab_handle)
       name = name or ('Tab ' .. vim.api.nvim_tabpage_get_number(tab_handle)),
       buffers = buffers,
       current = current,
+      pinned = pinned,
     }
     M.save_tab_state(tab_handle)
   end
@@ -129,6 +132,7 @@ function M.remove_tab_state(tab_handle)
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_name')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_buffers')
     pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_current')
+    pcall(vim.api.nvim_tabpage_del_var, tab_handle, 'tabflow_pinned')
   end
   M.state.tabs[tab_handle] = nil
 end
@@ -173,6 +177,31 @@ function M.tab_has_modified_buffers(tab_handle)
   end
 
   return false
+end
+
+function M.is_tab_pinned(tab_handle)
+  local s = M.get_tab_state(tab_handle)
+  return s and s.pinned or false
+end
+
+function M.set_tab_pinned(tab_handle, pinned)
+  local s = M.get_tab_state(tab_handle)
+  if not s then
+    return
+  end
+
+  s.pinned = pinned and true or false
+  M.save_tab_state(tab_handle)
+end
+
+function M.count_pinned_tabs()
+  local count = 0
+  for _, tab_handle in ipairs(vim.api.nvim_list_tabpages()) do
+    if M.is_tab_pinned(tab_handle) then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 function M.rename_tab(tab_handle, name)
@@ -252,6 +281,7 @@ local function save_tab_state_to_vars(tab_handle, s)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'title', s.name)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_buffers', s.buffers)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_current', s.current)
+  pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_pinned', s.pinned)
 end
 
 function M.save_tab_state(tab_handle)
@@ -274,6 +304,7 @@ function M.sync_to_global()
     names = {},
     buffers = {},
     currents = {},
+    pinned = {},
   }
   local tabs = vim.api.nvim_list_tabpages()
   for i, tab_handle in ipairs(tabs) do
@@ -282,6 +313,7 @@ function M.sync_to_global()
       data.names[i] = s.name
       data.buffers[i] = s.buffers
       data.currents[i] = s.current
+      data.pinned[i] = s.pinned
     else
       data.names[i] = get_tab_title(tab_handle)
     end
@@ -303,6 +335,7 @@ function M.restore_from_global()
   local names = data.names or {}
   local buffers = data.buffers or {}
   local currents = data.currents or {}
+  local pinned = data.pinned or {}
 
   local tabs = vim.api.nvim_list_tabpages()
   for i = 1, #tabs do
@@ -321,6 +354,13 @@ function M.restore_from_global()
       local cur = currents[i] or currents[tostring(i)]
       if cur then
         s.current = cur
+      end
+      local pin = pinned[i]
+      if pin == nil then
+        pin = pinned[tostring(i)]
+      end
+      if pin ~= nil then
+        s.pinned = pin and true or false
       end
       save_tab_state_to_vars(tab_handle, s)
     end

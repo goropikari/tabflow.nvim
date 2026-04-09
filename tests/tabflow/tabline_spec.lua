@@ -7,6 +7,7 @@ describe('tabflow.tabline', function()
     state.state.tabs = {}
     state.state.markers.modified = '●'
     state.state.markers.unmodified = ''
+    state.state.markers.pinned = '[P]'
 
     while #vim.api.nvim_list_tabpages() > 1 do
       vim.cmd('tabclose')
@@ -76,5 +77,20 @@ describe('tabflow.tabline', function()
     local items = tabline.build_items()
 
     assert.are.equal('First -', items[2].label)
+  end)
+
+  it('shows the pin marker for pinned tabs', function()
+    local first_tab = vim.api.nvim_get_current_tabpage()
+    local first_buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_set_option_value('swapfile', false, { buf = first_buf })
+    vim.api.nvim_buf_set_name(first_buf, vim.fn.tempname() .. '.lua')
+
+    state.rename_tab(first_tab, 'First')
+    state.add_buffer(first_tab, first_buf)
+    state.set_tab_pinned(first_tab, true)
+
+    local items = tabline.build_items()
+
+    assert.are.equal('First [P]', items[2].label)
   end)
 end)

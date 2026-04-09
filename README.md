@@ -39,6 +39,7 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
     markers = {
       modified = "●",
       unmodified = "",
+      pinned = "[P]",
     },
   },
 }
@@ -51,6 +52,7 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
 - **Click** a tab or buffer to switch to it.
 - **Click the `[TABS]` / `[BUFFERS]` indicator** to toggle display modes.
 - **Middle-Click** an item to close it.
+  - Pinned tabs must be unpinned before they can be closed.
 - **Right-Click** a tab item to rename it.
 - **Drag** an item to reorder it.
   - Dropping a buffer onto a different tab item moves that buffer to that workspace.
@@ -66,6 +68,10 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
 - `:TabflowNextTab` / `:TabflowPrevTab`: Navigate tabs.
 - `:TabflowNextBuffer` / `:TabflowPrevBuffer`: Navigate buffers in current workspace.
 - `:TabflowRenameTab <name>`: Rename the current workspace.
+- `:TabflowTogglePinTab`: Toggle pin on the current workspace.
+- `:TabflowPinTab`: Pin the current workspace.
+- `:TabflowUnpinTab`: Unpin the current workspace.
+- Pinned workspaces cannot be closed until unpinned.
 - `:TabflowSetGitBranchName`: Set the current tab name to the git branch name.
 - `:TabflowNewTab`: Create a new workspace.
 - `:TabflowCloseTab`: Close the current workspace.
@@ -131,6 +137,11 @@ require('tabflow.actions').switch_to_buffer(bufnr)
 ```lua
 -- Rename a tab
 require('tabflow.actions').rename_tab(tab_handle, name)
+
+-- Pin or unpin a tab
+require('tabflow.actions').toggle_tab_pinned(tab_handle)
+require('tabflow.actions').pin_tab(tab_handle)
+require('tabflow.actions').unpin_tab(tab_handle)
 
 -- Open rename prompt for a tab
 require('tabflow.actions').prompt_rename_tab(tab_handle)

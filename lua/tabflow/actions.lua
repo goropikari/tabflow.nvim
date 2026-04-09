@@ -1,6 +1,7 @@
 local state = require('tabflow.state')
 
 local M = {}
+local move_tab_into_pinned_section
 
 local function navigate_list(list, current_item, direction)
   if #list == 0 then
@@ -71,7 +72,33 @@ function M.prompt_rename_tab(tab_handle)
   end)
 end
 
+function M.toggle_tab_pinned(tab_handle)
+  local pinned = not state.is_tab_pinned(tab_handle)
+  state.set_tab_pinned(tab_handle, pinned)
+  move_tab_into_pinned_section(tab_handle, pinned)
+end
+
+function M.pin_tab(tab_handle)
+  if not state.is_tab_pinned(tab_handle) then
+    state.set_tab_pinned(tab_handle, true)
+    move_tab_into_pinned_section(tab_handle, true)
+  end
+end
+
+function M.unpin_tab(tab_handle)
+  if state.is_tab_pinned(tab_handle) then
+    state.set_tab_pinned(tab_handle, false)
+    move_tab_into_pinned_section(tab_handle, false)
+  end
+end
+
 function M.close_tab(tab_handle)
+  if state.is_tab_pinned(tab_handle) then
+    vim.notify('Pinned tabs cannot be closed. Unpin the tab first.', vim.log.levels.WARN)
+    vim.cmd('redrawtabline')
+    return
+  end
+
   state.remove_tab_state(tab_handle)
   vim.api.nvim_set_current_tabpage(tab_handle)
   vim.cmd('tabclose')
@@ -93,6 +120,16 @@ local function delete_if_unreferenced(bufnr)
   if not M.is_buffer_in_any_tab(bufnr) then
     vim.api.nvim_buf_delete(bufnr, { force = false })
   end
+end
+
+move_tab_into_pinned_section = function(tab_handle, pinned)
+  local target_index
+  if pinned then
+    target_index = state.count_pinned_tabs()
+  else
+    target_index = state.count_pinned_tabs() + 1
+  end
+  M.reorder_tabs(tab_handle, target_index)
 end
 
 function M.close_buffer(bufnr)
@@ -121,6 +158,19 @@ function M.reorder_tabs(source_tab, target_index)
   end
 
   if source_idx == 0 or source_idx == target_index then
+    return
+  end
+
+  local pinned_count = state.count_pinned_tabs()
+  local source_is_pinned = state.is_tab_pinned(source_tab)
+
+  if source_is_pinned then
+    target_index = math.max(1, math.min(target_index, pinned_count))
+  else
+    target_index = math.max(pinned_count + 1, math.min(target_index, #tab_handles))
+  end
+
+  if source_idx == target_index then
     return
   end
 

@@ -9,6 +9,7 @@ describe('tabflow.state', function()
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_name')
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_buffers')
     pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_current')
+    pcall(vim.api.nvim_tabpage_del_var, tab, 'tabflow_pinned')
     pcall(vim.api.nvim_tabpage_del_var, tab, 'title')
   end)
 
@@ -66,5 +67,13 @@ describe('tabflow.state', function()
     assert.has_no_errors(function()
       state.remove_buffer_everywhere(1)
     end)
+  end)
+
+  it('can mark a tab as pinned', function()
+    local tab = vim.api.nvim_get_current_tabpage()
+
+    state.set_tab_pinned(tab, true)
+
+    assert.is_true(state.is_tab_pinned(tab))
   end)
 end)
