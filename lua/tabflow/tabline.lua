@@ -29,14 +29,9 @@ local function default_tab_formatter(item)
 end
 
 -- Default formatter for buffer labels
+-- Note: Icons are handled by render_items(), not the formatter
 local function default_buffer_formatter(item)
-  local parts = {}
-
-  if item.icon then
-    table.insert(parts, item.icon)
-  end
-
-  table.insert(parts, item.name)
+  local parts = { item.name }
 
   if item.markers.modified then
     table.insert(parts, item.markers.modified)
@@ -196,7 +191,6 @@ function M.build_items()
               unmodified = (not is_modified) and state.state.markers.unmodified or nil,
             },
             diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
-            icon = icon_char,
           }, {
             is_active = bufnr == current_buf,
           })
@@ -209,7 +203,6 @@ function M.build_items()
                 unmodified = (not is_modified) and state.state.markers.unmodified,
               },
               diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
-              icon = icon_char,
             })
           end
         else
@@ -220,7 +213,6 @@ function M.build_items()
               unmodified = (not is_modified) and state.state.markers.unmodified,
             },
             diagnostics = state.state.diagnostics.enabled and diagnostics or nil,
-            icon = icon_char,
           })
         end
 
@@ -275,10 +267,12 @@ function M.render_items(items)
 
   -- 2. Calculate widths and find active item for viewport logic
   local active_idx = 1
+  local has_custom_formatter = state.state.label_formatter ~= nil
   for i, item in ipairs(other_items) do
     local hl = item.active and M.HL.active or M.HL.inactive
     local icon_char, icon_hl = nil, nil
-    if item.kind == 'buffer' and item.id then
+    -- Only fetch icon if no custom formatter is used (custom formatters include icons in the label)
+    if not has_custom_formatter and item.kind == 'buffer' and item.id then
       icon_char, icon_hl = get_icon(item.id, hl)
     end
 
@@ -359,7 +353,7 @@ function M.render_items(items)
           res = res .. '%#' .. icon_hl .. '#' .. icon_char
           res = res .. '%#' .. hl .. '# ' .. item.label .. ' ' -- icon-to-label space and rest
         else
-          res = res .. '%#' .. hl .. '#' .. item.full_label
+          res = res .. '%#' .. hl .. '# ' .. item.label .. ' '
         end
 
         table.insert(layout_items, {
