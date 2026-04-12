@@ -3,6 +3,11 @@ local state = require('tabflow.state')
 local M = {}
 local move_tab_into_pinned_section
 
+---@generic T
+---@param list T[]
+---@param current_item T
+---@param direction integer
+---@return T?
 local function navigate_list(list, current_item, direction)
   if #list == 0 then
     return nil
@@ -21,21 +26,25 @@ local function navigate_list(list, current_item, direction)
   return list[1]
 end
 
+---@return nil
 function M.toggle_mode()
   state.state.mode = state.state.mode == 'tabs' and 'buffers' or 'tabs'
   vim.cmd('redrawtabline')
 end
 
+---@return nil
 function M.enter_tabs_mode()
   state.state.mode = 'tabs'
   vim.cmd('redrawtabline')
 end
 
+---@return nil
 function M.enter_buffers_mode()
   state.state.mode = 'buffers'
   vim.cmd('redrawtabline')
 end
 
+---@param tab_handle integer
 function M.switch_to_tab(tab_handle)
   vim.api.nvim_set_current_tabpage(tab_handle)
   local s = state.get_tab_state(tab_handle)
@@ -46,6 +55,7 @@ function M.switch_to_tab(tab_handle)
   vim.cmd('redrawtabline')
 end
 
+---@param bufnr integer
 function M.switch_to_buffer(bufnr)
   vim.api.nvim_set_current_buf(bufnr)
   local current_tab = vim.api.nvim_get_current_tabpage()
@@ -55,11 +65,14 @@ function M.switch_to_buffer(bufnr)
   vim.cmd('redrawtabline')
 end
 
+---@param tab_handle integer
+---@param name string
 function M.rename_tab(tab_handle, name)
   state.rename_tab(tab_handle, name)
   vim.cmd('redrawtabline')
 end
 
+---@param tab_handle integer
 function M.prompt_rename_tab(tab_handle)
   local current_name = state.get_tab_name(tab_handle)
   vim.ui.input({
@@ -72,12 +85,14 @@ function M.prompt_rename_tab(tab_handle)
   end)
 end
 
+---@param tab_handle integer
 function M.toggle_tab_pinned(tab_handle)
   local pinned = not state.is_tab_pinned(tab_handle)
   state.set_tab_pinned(tab_handle, pinned)
   move_tab_into_pinned_section(tab_handle, pinned)
 end
 
+---@param tab_handle integer
 function M.pin_tab(tab_handle)
   if not state.is_tab_pinned(tab_handle) then
     state.set_tab_pinned(tab_handle, true)
@@ -85,6 +100,7 @@ function M.pin_tab(tab_handle)
   end
 end
 
+---@param tab_handle integer
 function M.unpin_tab(tab_handle)
   if state.is_tab_pinned(tab_handle) then
     state.set_tab_pinned(tab_handle, false)
@@ -92,6 +108,7 @@ function M.unpin_tab(tab_handle)
   end
 end
 
+---@param tab_handle integer
 function M.close_tab(tab_handle)
   if state.is_tab_pinned(tab_handle) then
     vim.notify('Pinned tabs cannot be closed. Unpin the tab first.', vim.log.levels.WARN)
@@ -105,6 +122,8 @@ function M.close_tab(tab_handle)
   vim.cmd('redrawtabline')
 end
 
+---@param bufnr integer
+---@return boolean
 function M.is_buffer_in_any_tab(bufnr)
   for _, s in pairs(state.state.tabs) do
     if vim.iter(s.buffers):find(function(b)
@@ -116,12 +135,15 @@ function M.is_buffer_in_any_tab(bufnr)
   return false
 end
 
+---@param bufnr integer
 local function delete_if_unreferenced(bufnr)
   if not M.is_buffer_in_any_tab(bufnr) then
     vim.api.nvim_buf_delete(bufnr, { force = false })
   end
 end
 
+---@param tab_handle integer
+---@param pinned boolean
 move_tab_into_pinned_section = function(tab_handle, pinned)
   local target_index
   if pinned then
@@ -132,6 +154,7 @@ move_tab_into_pinned_section = function(tab_handle, pinned)
   M.reorder_tabs(tab_handle, target_index)
 end
 
+---@param bufnr integer
 function M.close_buffer(bufnr)
   local current_tab = vim.api.nvim_get_current_tabpage()
   state.remove_buffer(current_tab, bufnr)
@@ -147,6 +170,8 @@ function M.close_buffer(bufnr)
   vim.cmd('redrawtabline')
 end
 
+---@param source_tab integer
+---@param target_index integer
 function M.reorder_tabs(source_tab, target_index)
   local tab_handles = vim.api.nvim_list_tabpages()
   local source_idx = 0
@@ -190,6 +215,9 @@ function M.reorder_tabs(source_tab, target_index)
   vim.cmd('redrawtabline')
 end
 
+---@param tab_handle integer
+---@param source_index integer
+---@param target_index integer
 function M.reorder_buffers(tab_handle, source_index, target_index)
   local s = state.get_tab_state(tab_handle)
   local bufnr = table.remove(s.buffers, source_index)
@@ -198,6 +226,10 @@ function M.reorder_buffers(tab_handle, source_index, target_index)
   vim.cmd('redrawtabline')
 end
 
+---@param bufnr integer
+---@param source_tab integer
+---@param target_tab integer
+---@param target_index? integer
 function M.move_buffer_between_tabs(bufnr, source_tab, target_tab, target_index)
   state.remove_buffer(source_tab, bufnr)
   local s_target = state.get_tab_state(target_tab)
@@ -210,6 +242,8 @@ function M.move_buffer_between_tabs(bufnr, source_tab, target_tab, target_index)
   vim.cmd('redrawtabline')
 end
 
+---@param kind 'tab'|'buffer'
+---@param direction integer
 function M.navigate(kind, direction)
   if kind == 'tab' then
     local current = vim.api.nvim_get_current_tabpage()
@@ -232,22 +266,27 @@ function M.navigate(kind, direction)
   vim.cmd('redrawtabline')
 end
 
+---@return nil
 function M.next_tab()
   M.navigate('tab', 1)
 end
 
+---@return nil
 function M.prev_tab()
   M.navigate('tab', -1)
 end
 
+---@return nil
 function M.next_buffer()
   M.navigate('buffer', 1)
 end
 
+---@return nil
 function M.prev_buffer()
   M.navigate('buffer', -1)
 end
 
+---@param branch_name? string
 function M.select_worktree(branch_name)
   if branch_name and branch_name ~= '' then
     state.open_worktree_tab(branch_name)

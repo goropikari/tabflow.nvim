@@ -1,3 +1,47 @@
+---@class TabflowDiagnosticCounts
+---@field error integer
+---@field warn integer
+---@field info integer
+---@field hint integer
+
+---@class TabflowDiagnosticMarkers
+---@field error string
+---@field warn string
+---@field info string
+---@field hint string
+
+---@class TabflowLayoutItem
+---@field kind 'mode_toggle'|'tab'|'buffer'
+---@field id? integer
+---@field label string
+---@field start_col integer
+---@field end_col integer
+---@field index? integer
+
+---@class TabflowDragPending
+---@field item? TabflowLayoutItem
+---@field start_mouse { row: integer, col: integer }
+
+---@class TabflowDragState
+---@field active boolean
+---@field pending? TabflowDragPending
+---@field kind? 'tab'|'buffer'
+---@field source_id? integer
+---@field source_tab? integer
+---@field source_index? integer
+---@field start_mouse? { row: integer, col: integer }
+---@field hover_target? TabflowLayoutItem
+---@field window? integer
+---@field buffer? integer
+
+---@class TabflowLayoutState
+---@field items TabflowLayoutItem[]
+---@field revision integer
+
+---@class TabflowWorktree
+---@field path string
+---@field branch string
+
 ---@class TabflowState
 local M = {}
 
@@ -17,11 +61,12 @@ local M = {}
 ---@field mode 'tabs'|'buffers'
 ---@field icons { color: boolean }
 ---@field markers { modified: string, unmodified: string, pinned: string }
----@field diagnostics { enabled: boolean, markers: { error: string, warn: string, info: string, hint: string } }
+---@field diagnostics { enabled: boolean, markers: TabflowDiagnosticMarkers }
 ---@field label_formatter fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
 ---@field drag TabflowDragState
----@field layout { items: any[], revision: number }
+---@field layout TabflowLayoutState
 ---@field tabs table<number, TabflowTabState>
+---@type TabflowConfig
 M.state = {
   mode = 'tabs', -- "tabs" or "buffers"
 
@@ -262,6 +307,8 @@ function M.count_pinned_tabs()
   return count
 end
 
+---@param bufnr integer
+---@return TabflowDiagnosticCounts
 local function count_diagnostics_for_buffer(bufnr)
   local counts = {
     error = 0,
@@ -289,6 +336,9 @@ local function count_diagnostics_for_buffer(bufnr)
   return counts
 end
 
+---@param base TabflowDiagnosticCounts
+---@param extra TabflowDiagnosticCounts
+---@return TabflowDiagnosticCounts
 local function merge_diagnostic_counts(base, extra)
   base.error = base.error + extra.error
   base.warn = base.warn + extra.warn
@@ -297,10 +347,14 @@ local function merge_diagnostic_counts(base, extra)
   return base
 end
 
+---@param bufnr integer
+---@return TabflowDiagnosticCounts
 function M.get_buffer_diagnostic_counts(bufnr)
   return count_diagnostics_for_buffer(bufnr)
 end
 
+---@param tab_handle integer
+---@return TabflowDiagnosticCounts
 function M.get_tab_diagnostic_counts(tab_handle)
   local s = M.get_tab_state(tab_handle)
   local counts = {
@@ -321,6 +375,8 @@ function M.get_tab_diagnostic_counts(tab_handle)
   return counts
 end
 
+---@param tab_handle integer
+---@param name string
 function M.rename_tab(tab_handle, name)
   local s = M.get_tab_state(tab_handle)
   if s then
@@ -329,6 +385,7 @@ function M.rename_tab(tab_handle, name)
   end
 end
 
+---@param tab_handle? integer
 function M.set_tab_name_to_git_branch(tab_handle)
   tab_handle = tab_handle or vim.api.nvim_get_current_tabpage()
   local branch = require('tabflow.util').git_branch()
@@ -341,6 +398,7 @@ function M.set_tab_name_to_git_branch(tab_handle)
   vim.cmd('redrawtabline')
 end
 
+---@return TabflowWorktree[]
 function M.get_git_worktrees()
   local util = require('tabflow.util')
   local root = util.git_root()
@@ -365,6 +423,7 @@ function M.get_git_worktrees()
   return worktrees
 end
 
+---@param branch_name string
 function M.open_worktree_tab(branch_name)
   local worktrees = M.get_git_worktrees()
   local target = nil
@@ -390,6 +449,8 @@ function M.open_worktree_tab(branch_name)
   vim.notify('Switched to worktree: ' .. target.path .. ' (' .. branch_name .. ')')
 end
 
+---@param tab_handle integer
+---@param s TabflowTabState
 local function save_tab_state_to_vars(tab_handle, s)
   if not vim.api.nvim_tabpage_is_valid(tab_handle) then
     return
@@ -401,6 +462,7 @@ local function save_tab_state_to_vars(tab_handle, s)
   pcall(vim.api.nvim_tabpage_set_var, tab_handle, 'tabflow_pinned', s.pinned)
 end
 
+---@param tab_handle integer
 function M.save_tab_state(tab_handle)
   local s = M.state.tabs[tab_handle]
   if not s then
@@ -484,6 +546,7 @@ function M.restore_from_global()
   end
 end
 
+---@return 'tabs'|'buffers'
 function M.get_mode()
   return M.state.mode
 end

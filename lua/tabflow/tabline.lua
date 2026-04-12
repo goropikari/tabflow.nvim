@@ -3,9 +3,18 @@ local util = require('tabflow.util')
 
 local M = {}
 
+---@class TabflowRenderItem: TabflowLayoutItem
+---@field active? boolean
+---@field icon_char? string
+---@field icon_hl? string
+---@field full_label? string
+---@field display_width? integer
+
 local icon_cache = {}
 
 -- Default formatter for tab labels
+---@param item TabflowLabelItem
+---@return string
 local function default_tab_formatter(item)
   local parts = { item.name }
 
@@ -30,6 +39,8 @@ end
 
 -- Default formatter for buffer labels
 -- Note: Icons are handled by render_items(), not the formatter
+---@param item TabflowLabelItem
+---@return string
 local function default_buffer_formatter(item)
   local parts = { item.name }
 
@@ -50,6 +61,9 @@ local function default_buffer_formatter(item)
 end
 
 -- Get icon for a file
+---@param bufnr integer
+---@param base_hl string
+---@return string?, string?
 local function get_icon(bufnr, base_hl)
   local has_devicons, devicons = pcall(require, 'nvim-web-devicons')
   if not has_devicons then
@@ -77,6 +91,7 @@ local function get_icon(bufnr, base_hl)
   return icon, icon_hl
 end
 
+---@type { active: string, inactive: string, fill: string, separator: string, modified: string, hover: string, icon_color: string }
 M.HL = {
   active = 'IdeTablineActive',
   inactive = 'IdeTablineInactive',
@@ -87,6 +102,7 @@ M.HL = {
   icon_color = 'IdeTablineIconColor',
 }
 
+---@return string
 function M.render()
   local items = M.build_items()
   local tabline_str, layout_items = M.render_items(items)
@@ -98,7 +114,9 @@ function M.render()
   return tabline_str
 end
 
+---@return TabflowRenderItem[]
 function M.build_items()
+  ---@type TabflowRenderItem[]
   local items = {}
   local mode_label = (state.state.mode == 'tabs' and 'TABS' or 'BUFFERS')
 
@@ -230,14 +248,18 @@ function M.build_items()
   return items
 end
 
+---@param items TabflowRenderItem[]
+---@return string, TabflowLayoutItem[]
 function M.render_items(items)
   local total_width = vim.o.columns
   local res = ''
+  ---@type TabflowLayoutItem[]
   local layout_items = {}
   local current_col = 0
 
   -- Separate mode toggle from other items
   local mode_toggle_item = nil
+  ---@type TabflowRenderItem[]
   local other_items = {}
   for _, item in ipairs(items) do
     if item.kind == 'mode_toggle' then
@@ -380,6 +402,8 @@ function M.render_items(items)
 end
 
 -- Hit testing based on screen column
+---@param col integer
+---@return TabflowLayoutItem?
 function M.hit_test(col)
   for _, item in ipairs(state.state.layout.items) do
     if col >= item.start_col and col < item.end_col then

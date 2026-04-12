@@ -1,5 +1,7 @@
 local M = {}
 
+---@param bufnrs integer[]
+---@return table<integer, string>
 function M.get_unique_labels(bufnrs)
   local labels = {}
   local full_paths = {}
@@ -32,6 +34,8 @@ function M.get_unique_labels(bufnrs)
   return labels
 end
 
+---@param path? string
+---@return string?
 function M.git_root(path)
   path = path or vim.fn.getcwd()
   local root = vim.fn.system('git -C ' .. vim.fn.shellescape(path) .. ' rev-parse --show-toplevel 2>/dev/null')
@@ -39,6 +43,8 @@ function M.git_root(path)
   return root ~= '' and root or nil
 end
 
+---@param root? string
+---@return string?
 function M.git_branch(root)
   root = root or M.git_root()
   if not root then
@@ -57,6 +63,8 @@ function M.git_branch(root)
   return branch ~= '' and branch or nil
 end
 
+---@param bufnr integer
+---@return boolean
 function M.is_normal_file_buffer(bufnr)
   if not vim.api.nvim_buf_is_valid(bufnr) then
     return false
@@ -67,6 +75,9 @@ function M.is_normal_file_buffer(bufnr)
 end
 
 -- Format diagnostic counts into a string with markers
+---@param counts? TabflowDiagnosticCounts
+---@param markers? TabflowDiagnosticMarkers
+---@return string?
 function M.format_diagnostics(counts, markers)
   if not counts then
     return nil
@@ -96,6 +107,8 @@ function M.format_diagnostics(counts, markers)
 end
 
 -- Combine label elements with proper spacing
+---@param elements (string|nil)[]
+---@return string
 function M.combine_elements(elements)
   local parts = {}
   for _, elem in ipairs(elements) do

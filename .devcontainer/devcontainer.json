@@ -10,6 +10,5 @@
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/goropikari/devcontainer-feature/neovim:1": {},
     "ghcr.io/goropikari/devcontainer-feature/tree-sitter:1": {}
-  },
-  "postCreateCommand": "cp -r .devcontainer/nvim ~/.config"
+  }
 }

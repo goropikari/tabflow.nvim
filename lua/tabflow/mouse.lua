@@ -3,6 +3,13 @@ local tabline = require('tabflow.tabline')
 
 local M = {}
 
+---@class TabflowDropData
+---@field kind 'tab'|'buffer'
+---@field source_id integer
+---@field source_tab integer?
+---@field source_index integer?
+---@field hover_target? TabflowLayoutItem
+
 function M.setup()
   local maps = {
     ['<LeftMouse>'] = M.on_left_mouse,
@@ -174,6 +181,7 @@ function M.on_left_release()
   vim.cmd('redrawtabline')
 end
 
+---@param label string
 function M.create_ghost(label)
   local drag = state.state.drag
   if not drag.buffer or not vim.api.nvim_buf_is_valid(drag.buffer) then
@@ -195,6 +203,7 @@ function M.create_ghost(label)
   vim.api.nvim_set_option_value('winhl', 'Normal:IdeTablineHover', { win = drag.window })
 end
 
+---@param col integer
 function M.update_ghost(col)
   local drag = state.state.drag
   if drag.window and vim.api.nvim_win_is_valid(drag.window) then
@@ -214,6 +223,7 @@ function M.cleanup_ghost()
   drag.window = nil
 end
 
+---@param data TabflowDropData
 function M.handle_drop_logic(data)
   local actions = require('tabflow.actions')
   local target = data.hover_target

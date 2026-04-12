@@ -1,5 +1,32 @@
+---@alias TabflowCommandName
+---| 'TabflowTabsMode'
+---| 'TabflowBuffersMode'
+---| 'TabflowToggleMode'
+---| 'TabflowNextTab'
+---| 'TabflowPrevTab'
+---| 'TabflowNextBuffer'
+---| 'TabflowPrevBuffer'
+---| 'TabflowRenameTab'
+---| 'TabflowTogglePinTab'
+---| 'TabflowPinTab'
+---| 'TabflowUnpinTab'
+---| 'TabflowSetGitBranchName'
+---| 'TabflowNewTab'
+---| 'TabflowCloseTab'
+---| 'TabflowCloseBuffer'
+---| 'TabflowDeleteOtherBuffers'
+---| 'TabflowOpenWorktree'
+
+---@class TabflowSetupOpts
+---@field icons? { color?: boolean }
+---@field markers? { modified?: string, unmodified?: string, pinned?: string }
+---@field diagnostics? { enabled?: boolean, markers?: { error?: string, warn?: string, info?: string, hint?: string } }
+---@field label_formatter? fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
+---@field commands? TabflowCommandName[]
+
 local M = {}
 
+---@param opts? TabflowSetupOpts
 function M.setup(opts)
   opts = opts or {}
   opts.commands = opts.commands or {}
@@ -38,6 +65,7 @@ function M.setup(opts)
 
   -- Register only configured commands
   local actions = require('tabflow.actions')
+  ---@type table<TabflowCommandName, { fn: fun(args?: vim.api.keyset.create_user_command.command_args), opts: vim.api.keyset.user_command }>
   local command_defs = {
     TabflowTabsMode = { fn = actions.enter_tabs_mode, opts = {} },
     TabflowBuffersMode = { fn = actions.enter_buffers_mode, opts = {} },
