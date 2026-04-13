@@ -14,6 +14,7 @@ describe('tabflow.tabline', function()
     state.state.diagnostics.markers.warn = 'W'
     state.state.diagnostics.markers.info = 'I'
     state.state.diagnostics.markers.hint = 'H'
+    state.state.right_section = nil
 
     while #vim.api.nvim_list_tabpages() > 1 do
       vim.cmd('tabclose')
@@ -158,5 +159,51 @@ describe('tabflow.tabline', function()
     local items = tabline.build_items()
 
     assert.are.equal(vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':t'), items[2].label)
+  end)
+
+  it('returns an empty right section when no provider is configured', function()
+    assert.are.equal('', tabline.render_right_section())
+  end)
+
+  it('returns the configured right section when available', function()
+    state.state.right_section = function()
+      return '%#Special#sync'
+    end
+
+    assert.are.equal('%#Special#sync', tabline.render_right_section())
+  end)
+
+  it('returns an empty right section when the provider returns nil or empty', function()
+    state.state.right_section = function()
+      return nil
+    end
+    assert.are.equal('', tabline.render_right_section())
+
+    state.state.right_section = function()
+      return ''
+    end
+    assert.are.equal('', tabline.render_right_section())
+  end)
+
+  it('returns an empty right section when the provider errors', function()
+    state.state.right_section = function()
+      error('boom')
+    end
+
+    assert.are.equal('', tabline.render_right_section())
+  end)
+
+  it('renders the right section expression on the right edge', function()
+    local rendered = select(
+      1,
+      tabline.render_items({
+        {
+          kind = 'mode_toggle',
+          label = '[TABS]',
+        },
+      })
+    )
+
+    assert.is_truthy(rendered:find("%{%v:lua.require('tabflow.tabline').render_right_section()%}", 1, true))
   end)
 end)

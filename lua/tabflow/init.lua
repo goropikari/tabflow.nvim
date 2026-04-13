@@ -22,6 +22,7 @@
 ---@field markers? { modified?: string, unmodified?: string, pinned?: string }
 ---@field diagnostics? { enabled?: boolean, markers?: { error?: string, warn?: string, info?: string, hint?: string } }
 ---@field label_formatter? fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
+---@field right_section? fun(): string?
 ---@field commands? TabflowCommandName[]
 
 local M = {}
@@ -43,6 +44,9 @@ function M.setup(opts)
   end
   if opts.label_formatter then
     state.state.label_formatter = opts.label_formatter
+  end
+  if opts.right_section ~= nil then
+    state.state.right_section = opts.right_section
   end
 
   require('tabflow.highlights').setup()

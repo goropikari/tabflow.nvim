@@ -103,6 +103,21 @@ M.HL = {
 }
 
 ---@return string
+function M.render_right_section()
+  local provider = state.state.right_section
+  if type(provider) ~= 'function' then
+    return ''
+  end
+
+  local ok, section = pcall(provider)
+  if not ok or type(section) ~= 'string' or section == '' then
+    return ''
+  end
+
+  return section
+end
+
+---@return string
 function M.render()
   local items = M.build_items()
   local tabline_str, layout_items = M.render_items(items)
@@ -395,8 +410,9 @@ function M.render_items(items)
     end
   end
 
-  -- Fill the rest
+  -- Fill the rest and optionally render a right-aligned custom section.
   res = res .. '%#' .. M.HL.fill .. '#%='
+  res = res .. "%{%v:lua.require('tabflow.tabline').render_right_section()%}"
 
   return res, layout_items
 end

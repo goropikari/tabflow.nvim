@@ -75,9 +75,17 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
       end
       return table.concat(parts, ' ')
     end,
+
+    -- Optional: Custom right-aligned tabline section
+    right_section = function()
+      return os.date(" %H:%M:%S ")
+    end,
   },
 }
 ```
+
+`right_section` should return a raw tabline string. Return `nil` or `""` to hide it.
+You can include statusline/tabline items such as `%#Highlight#` or `%{...}` when needed.
 
 ## 🎮 Usage
 

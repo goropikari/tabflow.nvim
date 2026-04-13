@@ -63,6 +63,7 @@ local M = {}
 ---@field markers { modified: string, unmodified: string, pinned: string }
 ---@field diagnostics { enabled: boolean, markers: TabflowDiagnosticMarkers }
 ---@field label_formatter fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
+---@field right_section fun(): string?
 ---@field drag TabflowDragState
 ---@field layout TabflowLayoutState
 ---@field tabs table<number, TabflowTabState>
@@ -95,6 +96,11 @@ M.state = {
   -- item = { type, id, name, markers, diagnostics, icon }
   -- ctx = { is_active, tab_handle? }
   label_formatter = nil,
+
+  -- Optional function to render a right-aligned tabline section.
+  -- Signature: right_section() -> string?
+  -- Return a raw tabline string. Returning nil/empty hides the section.
+  right_section = nil,
 
   drag = {
     active = false,
