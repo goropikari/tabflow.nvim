@@ -23,6 +23,7 @@
 ---@field diagnostics? { enabled?: boolean, markers?: { error?: string, warn?: string, info?: string, hint?: string } }
 ---@field label_formatter? fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
 ---@field right_section? fun(): string?
+---@field right_section_refresh_ms? integer
 ---@field commands? TabflowCommandName[]
 
 local M = {}
@@ -48,6 +49,7 @@ function M.setup(opts)
   if opts.right_section ~= nil then
     state.state.right_section = opts.right_section
   end
+  state.state.right_section_refresh_ms = opts.right_section_refresh_ms
 
   require('tabflow.highlights').setup()
   local autocmd = require('tabflow.autocmd')
@@ -66,6 +68,7 @@ function M.setup(opts)
 
   vim.o.showtabline = 2
   vim.o.tabline = "%!v:lua.require'tabflow.tabline'.render()"
+  state.start_right_section_timer()
 
   -- Register only configured commands
   local actions = require('tabflow.actions')

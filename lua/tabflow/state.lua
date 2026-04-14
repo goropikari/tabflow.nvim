@@ -64,6 +64,8 @@ local M = {}
 ---@field diagnostics { enabled: boolean, markers: TabflowDiagnosticMarkers }
 ---@field label_formatter fun(item: TabflowLabelItem, ctx: TabflowLabelCtx): string?
 ---@field right_section fun(): string?
+---@field right_section_refresh_ms integer?
+---@field right_section_timer uv.uv_timer_t?
 ---@field drag TabflowDragState
 ---@field layout TabflowLayoutState
 ---@field tabs table<number, TabflowTabState>
@@ -101,6 +103,8 @@ M.state = {
   -- Signature: right_section() -> string?
   -- Return a raw tabline string. Returning nil/empty hides the section.
   right_section = nil,
+  right_section_refresh_ms = nil,
+  right_section_timer = nil,
 
   drag = {
     active = false,
@@ -555,6 +559,40 @@ end
 ---@return 'tabs'|'buffers'
 function M.get_mode()
   return M.state.mode
+end
+
+function M.stop_right_section_timer()
+  local timer = M.state.right_section_timer
+  if not timer then
+    return
+  end
+
+  pcall(function()
+    timer:stop()
+  end)
+  pcall(function()
+    timer:close()
+  end)
+  M.state.right_section_timer = nil
+end
+
+function M.start_right_section_timer()
+  M.stop_right_section_timer()
+
+  local refresh_ms = M.state.right_section_refresh_ms
+  if type(M.state.right_section) ~= 'function' or type(refresh_ms) ~= 'number' or refresh_ms <= 0 then
+    return
+  end
+
+  local timer = vim.uv.new_timer()
+  M.state.right_section_timer = timer
+  timer:start(
+    refresh_ms,
+    refresh_ms,
+    vim.schedule_wrap(function()
+      pcall(vim.cmd, 'redrawtabline')
+    end)
+  )
 end
 
 return M

@@ -80,12 +80,16 @@ An IDE-style tabpage and buffer navigation plugin for Neovim 0.11+, using the ta
     right_section = function()
       return os.date(" %H:%M:%S ")
     end,
+    -- Optional: redraw interval for right_section in milliseconds
+    right_section_refresh_ms = 1000,
   },
 }
 ```
 
 `right_section` should return a raw tabline string. Return `nil` or `""` to hide it.
 You can include statusline/tabline items such as `%#Highlight#` or `%{...}` when needed.
+`right_section` is evaluated when the tabline redraws. For time-based content such as clocks, set
+`right_section_refresh_ms` to opt into periodic `redrawtabline`.
 
 ## 🎮 Usage
 

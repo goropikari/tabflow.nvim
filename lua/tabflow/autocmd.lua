@@ -65,6 +65,13 @@ function M.setup()
       vim.cmd('redrawtabline')
     end,
   })
+
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    group = group,
+    callback = function()
+      state.stop_right_section_timer()
+    end,
+  })
 end
 
 return M
