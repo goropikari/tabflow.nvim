@@ -9,16 +9,8 @@ function M.setup()
     group = group,
     callback = function()
       local bufnr = vim.api.nvim_get_current_buf()
-      if require('tabflow.util').is_normal_file_buffer(bufnr) then
-        local current_tab = vim.api.nvim_get_current_tabpage()
-        state.add_buffer(current_tab, bufnr)
-
-        local s = state.get_tab_state(current_tab)
-        if s then
-          s.current = bufnr
-          state.save_tab_state(current_tab)
-        end
-      end
+      local current_tab = vim.api.nvim_get_current_tabpage()
+      state.track_current_buffer(current_tab, bufnr)
     end,
   })
 

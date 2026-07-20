@@ -10,6 +10,26 @@ local M = {}
 ---@field source_index integer?
 ---@field hover_target? TabflowLayoutItem
 
+---@return table?
+local function get_mouse_on_tabline()
+  local mouse = vim.fn.getmousepos()
+  if mouse.screenrow ~= 1 then
+    return nil
+  end
+
+  return mouse
+end
+
+---@return TabflowLayoutItem?, table?
+local function get_tabline_item_under_mouse()
+  local mouse = get_mouse_on_tabline()
+  if not mouse then
+    return nil, nil
+  end
+
+  return tabline.hit_test(mouse.screencol - 1), mouse
+end
+
 function M.setup()
   local maps = {
     ['<LeftMouse>'] = M.on_left_mouse,
@@ -34,56 +54,49 @@ function M.setup()
 end
 
 function M.on_left_mouse()
-  local mouse = vim.fn.getmousepos()
-  if mouse.screenrow == 1 then
-    local item = tabline.hit_test(mouse.screencol - 1)
-    state.state.drag.active = false
-    state.state.drag.pending = {
-      item = item,
-      start_mouse = { row = mouse.screenrow, col = mouse.screencol },
-    }
-  else
+  local item, mouse = get_tabline_item_under_mouse()
+  if not mouse then
     state.state.drag.pending = nil
+    return
   end
+
+  state.state.drag.active = false
+  state.state.drag.pending = {
+    item = item,
+    start_mouse = { row = mouse.screenrow, col = mouse.screencol },
+  }
 end
 
 function M.on_middle_mouse()
-  local mouse = vim.fn.getmousepos()
-  if mouse.screenrow == 1 then
-    local item = tabline.hit_test(mouse.screencol - 1)
-    if item then
-      vim.schedule(function()
-        local actions = require('tabflow.actions')
-        if item.kind == 'tab' then
-          actions.close_tab(item.id)
-        elseif item.kind == 'buffer' then
-          actions.close_buffer(item.id)
-        end
-      end)
-    end
+  local item = get_tabline_item_under_mouse()
+  if item then
+    vim.schedule(function()
+      local actions = require('tabflow.actions')
+      if item.kind == 'tab' then
+        actions.close_tab(item.id)
+      elseif item.kind == 'buffer' then
+        actions.close_buffer(item.id)
+      end
+    end)
   end
 end
 
 function M.on_right_mouse()
-  local mouse = vim.fn.getmousepos()
-  if mouse.screenrow == 1 then
-    local item = tabline.hit_test(mouse.screencol - 1)
-    if item and item.kind == 'tab' then
-      vim.schedule(function()
-        local actions = require('tabflow.actions')
-        actions.prompt_rename_tab(item.id)
-      end)
-    end
+  local item = get_tabline_item_under_mouse()
+  if item and item.kind == 'tab' then
+    vim.schedule(function()
+      local actions = require('tabflow.actions')
+      actions.prompt_rename_tab(item.id)
+    end)
   end
 end
 
 function M.on_scroll_wheel(direction)
-  local mouse = vim.fn.getmousepos()
-  if mouse.screenrow == 1 then
+  if get_mouse_on_tabline() then
+    local dir_val = (direction == 'down') and 1 or -1
     vim.schedule(function()
       local actions = require('tabflow.actions')
       local s = require('tabflow.state')
-      local dir_val = (direction == 'down') and 1 or -1
       actions.navigate(s.state.mode == 'tabs' and 'tab' or 'buffer', dir_val)
     end)
   end
@@ -138,7 +151,7 @@ function M.on_left_drag()
 end
 
 function M.on_left_release()
-  local mouse = vim.fn.getmousepos()
+  local mouse = get_mouse_on_tabline()
   local drag = state.state.drag
 
   if drag.active then
@@ -154,7 +167,7 @@ function M.on_left_release()
       M.cleanup_ghost()
     end)
   elseif drag.pending then
-    if mouse.screenrow == 1 then
+    if mouse then
       local item = drag.pending.item
       if item then
         vim.schedule(function()

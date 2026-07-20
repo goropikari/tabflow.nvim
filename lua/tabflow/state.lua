@@ -207,6 +207,24 @@ end
 
 ---@param tab_handle number
 ---@param bufnr number
+function M.track_current_buffer(tab_handle, bufnr)
+  if not require('tabflow.util').is_normal_file_buffer(bufnr) then
+    return
+  end
+
+  M.add_buffer(tab_handle, bufnr)
+
+  local s = M.get_tab_state(tab_handle)
+  if not s then
+    return
+  end
+
+  s.current = bufnr
+  M.save_tab_state(tab_handle)
+end
+
+---@param tab_handle number
+---@param bufnr number
 function M.remove_buffer(tab_handle, bufnr)
   local s = M.get_tab_state(tab_handle)
   if not s then

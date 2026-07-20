@@ -56,15 +56,9 @@ function M.setup(opts)
   autocmd.setup()
   require('tabflow.mouse').setup()
 
-  -- Add current buffer at startup if it's a normal file
   local bufnr = vim.api.nvim_get_current_buf()
-  if require('tabflow.util').is_normal_file_buffer(bufnr) then
-    local current_tab = vim.api.nvim_get_current_tabpage()
-    state.add_buffer(current_tab, bufnr)
-    local s = state.get_tab_state(current_tab)
-    s.current = bufnr
-    state.save_tab_state(current_tab)
-  end
+  local current_tab = vim.api.nvim_get_current_tabpage()
+  state.track_current_buffer(current_tab, bufnr)
 
   vim.o.showtabline = 2
   vim.o.tabline = "%!v:lua.require'tabflow.tabline'.render()"
