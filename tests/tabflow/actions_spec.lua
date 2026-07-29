@@ -68,6 +68,26 @@ describe('tabflow.actions', function()
     assert.are.equal(b3, vim.api.nvim_get_current_buf())
   end)
 
+  it('navigates according to the current mode', function()
+    local tab = vim.api.nvim_get_current_tabpage()
+    local b1 = vim.api.nvim_create_buf(false, true)
+    local b2 = vim.api.nvim_create_buf(false, true)
+
+    state.add_buffer(tab, b1)
+    state.add_buffer(tab, b2)
+    vim.api.nvim_set_current_buf(b1)
+
+    actions.next_in_current_mode()
+    assert.are.equal(b2, vim.api.nvim_get_current_buf())
+
+    vim.cmd('tabnew')
+    local second_tab = vim.api.nvim_get_current_tabpage()
+    actions.enter_tabs_mode()
+    actions.prev_in_current_mode()
+    assert.are.equal(tab, vim.api.nvim_get_current_tabpage())
+    assert.are_not.equal(second_tab, vim.api.nvim_get_current_tabpage())
+  end)
+
   it('can close a buffer and switch to another in the workspace', function()
     local tab = vim.api.nvim_get_current_tabpage()
     local b1 = vim.api.nvim_create_buf(false, true)

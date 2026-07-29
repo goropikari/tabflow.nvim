@@ -105,6 +105,7 @@ You can include statusline/tabline items such as `%#Highlight#` or `%{...}` when
 - **Mouse Wheel** (on tabline): Navigate between tabs or buffers.
   - In Tab mode: Switch between tabs.
   - In Buffer mode: Switch between buffers.
+- `gt` / `gT`: Navigate to the next/previous tab in Tab mode, or the next/previous buffer in Buffer mode.
 
 ### Commands
 

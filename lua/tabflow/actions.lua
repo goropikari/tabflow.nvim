@@ -286,6 +286,24 @@ function M.prev_buffer()
   M.navigate('buffer', -1)
 end
 
+---@return nil
+function M.next_in_current_mode()
+  if state.get_mode() == 'buffers' then
+    M.next_buffer()
+  else
+    M.next_tab()
+  end
+end
+
+---@return nil
+function M.prev_in_current_mode()
+  if state.get_mode() == 'buffers' then
+    M.prev_buffer()
+  else
+    M.prev_tab()
+  end
+end
+
 ---@param branch_name? string
 function M.select_worktree(branch_name)
   if branch_name and branch_name ~= '' then

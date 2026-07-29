@@ -66,6 +66,12 @@ function M.setup(opts)
 
   -- Register only configured commands
   local actions = require('tabflow.actions')
+
+  -- Follow the active tabline mode for Neovim's standard tab navigation keys.
+  -- In buffer mode, gt/gT should navigate the buffers shown by tabflow.
+  vim.keymap.set('n', 'gt', actions.next_in_current_mode, { desc = 'Next tab/buffer' })
+  vim.keymap.set('n', 'gT', actions.prev_in_current_mode, { desc = 'Previous tab/buffer' })
+
   ---@type table<TabflowCommandName, { fn: fun(args?: vim.api.keyset.create_user_command.command_args), opts: vim.api.keyset.user_command }>
   local command_defs = {
     TabflowTabsMode = { fn = actions.enter_tabs_mode, opts = {} },
